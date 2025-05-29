@@ -1,26 +1,43 @@
 {
   "name": "sistema-os-backend",
   "version": "1.0.0",
-  "description": "Backend do Sistema de Ordens de Serviço",
+  "description": "Backend do Sistema de Ordens de Serviço - Oficina Macedo",
   "main": "server.js",
   "engines": {
     "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "npm": ">=9.0.0"
   },
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "echo 'No build step required'",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "echo 'No build step required for Node.js backend'",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "migrate": "npx sequelize-cli db:migrate",
+    "seed": "npx sequelize-cli db:seed:all",
+    "db:reset": "npx sequelize-cli db:drop && npx sequelize-cli db:create && npm run migrate && npm run seed"
   },
   "keywords": [
     "sistema",
     "os",
+    "ordem-servico",
     "oficina",
-    "backend"
+    "backend",
+    "api",
+    "nodejs",
+    "express",
+    "sequelize",
+    "postgresql"
   ],
-  "author": "Oficina Macedo",
+  "author": {
+    "name": "Oficina Macedo",
+    "email": "contato@oficinamacedo.com"
+  },
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/seu-usuario/sistema-os-backend.git"
+  },
+  "homepage": "https://sistema-macedo.vercel.app",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -41,5 +58,11 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
-  }
+  },
+  "bundledDependencies": [],
+  "private": false,
+  "config": {
+    "unsafe-perm": true
+  },
+  "bundleDependencies": []
 }
