@@ -1,0 +1,211 @@
+/* frontend/src/OrcamentoPrint.css - Crie este novo arquivo */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  /* Reset geral para impressão */
+  * {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Esconder tudo exceto o orçamento */
+  body > *:not(#root) {
+    display: none !important;
+  }
+
+  #root > *:not(div) {
+    display: none !important;
+  }
+
+  .MuiAppBar-root,
+  .MuiDrawer-root,
+  button {
+    display: none !important;
+  }
+
+  /* Configurar página A4 */
+  body {
+    width: 210mm !important;
+    height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #orcamento-print {
+    width: 210mm !important;
+    height: 297mm !important;
+    padding: 10mm !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    position: relative !important;
+    background: white !important;
+    display: block !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+  }
+
+  /* Remover todos os grids e usar layout simples */
+  .MuiGrid-root {
+    display: block !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Cabeçalho compacto */
+  .print-header {
+    display: block !important;
+    text-align: center !important;
+    padding-bottom: 5mm !important;
+    border-bottom: 2px solid #1976d2 !important;
+    margin-bottom: 5mm !important;
+  }
+
+  .print-header h1 {
+    font-size: 18pt !important;
+    color: #1976d2 !important;
+    margin-bottom: 2mm !important;
+  }
+
+  .print-header p {
+    font-size: 9pt !important;
+    line-height: 1.2 !important;
+    margin: 1mm 0 !important;
+  }
+
+  /* Título do orçamento */
+  #orcamento-print > .MuiTypography-h4 {
+    text-align: center !important;
+    font-size: 14pt !important;
+    margin-bottom: 5mm !important;
+    display: none !important; /* Esconder título duplicado */
+  }
+
+  /* Seções compactas */
+  .MuiPaper-root {
+    border: 1px solid #ddd !important;
+    padding: 3mm !important;
+    margin-bottom: 3mm !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Títulos de seção */
+  .MuiTypography-h6 {
+    font-size: 10pt !important;
+    font-weight: bold !important;
+    color: #1976d2 !important;
+    border-bottom: 1px solid #1976d2 !important;
+    padding-bottom: 1mm !important;
+    margin-bottom: 2mm !important;
+  }
+
+  /* Textos */
+  .MuiTypography-body1 {
+    font-size: 9pt !important;
+    line-height: 1.3 !important;
+  }
+
+  .MuiTypography-body2 {
+    font-size: 8pt !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Layout em duas colunas para dados */
+  .two-column {
+    display: flex !important;
+    gap: 10mm !important;
+  }
+
+  .two-column > div {
+    flex: 1 !important;
+  }
+
+  /* Tabela compacta */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 8pt !important;
+    margin-top: 2mm !important;
+  }
+
+  th, td {
+    border: 1px solid #ddd !important;
+    padding: 2mm !important;
+    text-align: left !important;
+  }
+
+  th {
+    background-color: #1976d2 !important;
+    color: white !important;
+    font-weight: bold !important;
+  }
+
+  /* Área de totais inline */
+  .total-section {
+    text-align: right !important;
+    margin-top: 3mm !important;
+  }
+
+  .total-section > * {
+    display: inline-block !important;
+    margin-left: 5mm !important;
+  }
+
+  /* Assinaturas no rodapé */
+  .print-signature {
+    display: flex !important;
+    justify-content: space-between !important;
+    position: absolute !important;
+    bottom: 10mm !important;
+    left: 10mm !important;
+    right: 10mm !important;
+    width: calc(100% - 20mm) !important;
+  }
+
+  .signature-box {
+    width: 45% !important;
+    text-align: center !important;
+  }
+
+  .signature-line {
+    border-top: 1px solid #333 !important;
+    margin-top: 8mm !important;
+    padding-top: 2mm !important;
+  }
+
+  .signature-box p {
+    font-size: 9pt !important;
+    margin: 0 !important;
+  }
+
+  /* Forçar uma página */
+  #orcamento-print > * {
+    page-break-inside: avoid !important;
+  }
+
+  /* Esconder elementos extras */
+  .MuiChip-root {
+    position: absolute !important;
+    top: 15mm !important;
+    right: 10mm !important;
+    font-size: 9pt !important;
+    padding: 1mm 3mm !important;
+  }
+
+  /* Ajustar espaçamento entre seções */
+  #orcamento-print .MuiPaper-root:nth-child(2) {
+    margin-bottom: 2mm !important;
+  }
+
+  /* Garantir que observações não quebre */
+  .MuiPaper-root:last-child {
+    max-height: 40mm !important;
+    overflow: hidden !important;
+  }
+}
