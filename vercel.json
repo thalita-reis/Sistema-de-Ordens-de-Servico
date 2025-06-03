@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "name": "sistema-macedo-full-stack",
+  "name": "sistema-macedo-os",
   "builds": [
     {
       "src": "backend/server.js",
@@ -28,13 +28,6 @@
       "dest": "/frontend/$1"
     }
   ],
-  "functions": {
-    "backend/server.js": {
-      "maxDuration": 30,
-      "memory": 512,
-      "runtime": "nodejs18.x"
-    }
-  },
   "env": {
     "NODE_ENV": "production"
   },
