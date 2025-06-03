@@ -1,14 +1,9 @@
 {
   "version": 2,
-  "name": "sistema-macedo-os",
   "builds": [
     {
       "src": "backend/server.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxLambdaSize": "50mb",
-        "includeFiles": "backend/**"
-      }
+      "use": "@vercel/node"
     },
     {
       "src": "frontend/package.json",
@@ -27,10 +22,5 @@
       "src": "/(.*)",
       "dest": "/frontend/$1"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "cleanUrls": true,
-  "trailingSlash": false
+  ]
 }
