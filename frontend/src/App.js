@@ -19,6 +19,9 @@ import OrcamentoView from './pages/Orcamentos/OrcamentoView';
 import Administracao from './pages/Administracao/Administracao';
 import Registro from './pages/Registro/Registro';
 
+// 🔧 NOVO: Componente de Debug para testes da API
+import DebugComponent from './components/DebugComponent';
+
 // ✅ REMOVIDO: import Usuarios - Sistema limpo sem funcionalidades problemáticas
 // import Usuarios from './pages/Usuarios/Usuarios';
 
@@ -151,6 +154,9 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<Registro />} />
           
+          {/* 🔧 NOVA: Rota de Debug - Acesso direto para testes */}
+          <Route path="/debug" element={<DebugComponent />} />
+          
           {/* ============================================ */}
           {/* 🔐 ROTAS PRIVADAS - REQUEREM AUTENTICAÇÃO */}
           {/* ============================================ */}
@@ -194,6 +200,9 @@ function App() {
             {/* ⚙️ ROTA DE ADMINISTRAÇÃO - FUNCIONAL */}
             <Route path="administracao" element={<Administracao />} />
             
+            {/* 🔧 ROTA DE DEBUG PROTEGIDA - Para usuários logados */}
+            <Route path="debug-admin" element={<DebugComponent />} />
+            
             {/* 🚫 ROTA 404 - REDIRECIONA PARA DASHBOARD */}
             <Route path="*" element={<Navigate to="/" replace />} />
             
@@ -222,15 +231,21 @@ export default App;
 - 👤 Gestão completa de clientes
 - 📋 Sistema de orçamentos
 - ⚙️ Painel de administração
+- 🔧 Sistema de debug para API (NOVO)
 
 ❌ FUNCIONALIDADES REMOVIDAS:
 - 👥 Gestão de usuários (temporariamente removida para estabilidade)
 
 🛡️ SISTEMA DE ROTAS:
-- Rotas públicas: /login, /registro
+- Rotas públicas: /login, /registro, /debug
 - Rotas privadas: Todas dentro do Layout com PrivateRoute
+- Rota de debug protegida: /debug-admin (para usuários logados)
 - Proteção automática contra acesso não autorizado
 - Redirecionamento inteligente
+
+🔧 ROTAS DE DEBUG DISPONÍVEIS:
+- /debug - Acesso público para testes básicos da API
+- /debug-admin - Acesso protegido para debug avançado
 
 🎨 TEMA:
 - Material-UI v5 com tema customizado
@@ -249,10 +264,12 @@ export default App;
 - Componentes reutilizáveis
 - Padrões consistentes
 - Fácil manutenção
+- Sistema de debug integrado
 
 🔧 CONFIGURAÇÃO:
 - Context API para autenticação
 - ThemeProvider para estilos
 - CssBaseline para reset de CSS
 - Estrutura modular e escalável
+- Debugging tools integradas
 */
