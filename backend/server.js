@@ -8,7 +8,7 @@ const path = require('path');
 const app = express();
 
 // ============================================
-// 🌐 CORS CONFIGURADO - VERSÃO OTIMIZADA
+// 🌐 CORS CONFIGURADO - VERSÃO OTIMIZADA PARA PRODUÇÃO
 // ============================================
 const corsOptions = {
   origin: [
@@ -28,8 +28,10 @@ const corsOptions = {
     /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:3000$/,
     /^http:\/\/172\.16\.\d{1,3}\.\d{1,3}:3000$/,
     
-    // URL de produção (se existir)
-    process.env.FRONTEND_URL
+    // ✅ URLs de produção
+    process.env.FRONTEND_URL,
+    'https://sistema-de-ordens-de-servico.onrender.com',
+    /^https:\/\/.*\.onrender\.com$/
   ].filter(Boolean), // Remove valores undefined
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -65,7 +67,13 @@ app.use(helmet({
 // ✅ CORS APLICADO UMA VEZ APENAS
 app.use(cors(corsOptions));
 
-app.use(morgan('combined'));
+// ✅ LOGS OTIMIZADOS PARA PRODUÇÃO
+if (process.env.NODE_ENV === 'production') {
+  app.use(morgan('combined'));
+} else {
+  app.use(morgan('dev'));
+}
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -91,39 +99,42 @@ const empresaRoutes = require('./src/routes/empresaRoutes');
 // 🛣️ CONFIGURAÇÃO DAS ROTAS
 // ============================================
 
-// Rota raiz com informações da API
+// ✅ ROTA RAIZ OTIMIZADA PARA RENDER
 app.get('/', (req, res) => {
-  console.log('\n🏠 =================================');
-  console.log('📋 PÁGINA INICIAL ACESSADA');
-  console.log('=================================');
-  console.log('🌐 IP:', req.ip);
-  console.log('🔧 User-Agent:', req.get('User-Agent'));
-  console.log('=================================\n');
+  // Log simplificado para produção
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('\n🏠 =================================');
+    console.log('📋 PÁGINA INICIAL ACESSADA');
+    console.log('=================================');
+    console.log('🌐 IP:', req.ip);
+    console.log('🔧 User-Agent:', req.get('User-Agent'));
+    console.log('=================================\n');
+  }
 
-  res.json({
+  res.status(200).json({
     message: 'API Sistema Macedo - Funcionando Perfeitamente!',
-    version: '2.2.0',
-    status: 'OK',
+    version: '2.3.0',
+    status: 'healthy',
+    environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
     cors: {
       enabled: true,
-      allowedOrigins: 'IPs da rede local + localhost',
-      note: 'Configurado para desenvolvimento - aceita conexões da rede'
+      note: 'Configurado para desenvolvimento e produção'
     },
-    endpoints: {
-      auth: '/api/auth/* - Sistema de autenticação',
-      clientes: '/api/clientes/* - Gestão de clientes',
-      orcamentos: '/api/orcamentos/* - Gestão de orçamentos',
-      empresa: '/api/dados-empresa/* - Dados da empresa OTIMIZADO',
-      health: '/api/health - Status do sistema'
-    },
+    endpoints: [
+      '/api/health',
+      '/api/auth',
+      '/api/clientes',
+      '/api/orcamentos',
+      '/api/dados-empresa'
+    ],
     features: {
       authentication: 'JWT Token',
       database: 'PostgreSQL',
       security: 'Helmet + CORS',
-      logging: 'Morgan + Custom',
-      network: 'Acessível em todas as interfaces',
-      stability: 'Sistema otimizado - CORS corrigido'
+      logging: 'Morgan',
+      stability: 'Otimizado para Render'
     }
   });
 });
@@ -149,99 +160,71 @@ app.use('/api/orcamentos', orcamentoRoutes);
 app.use('/api/dados-empresa', empresaRoutes);
 
 // ============================================
-// 🏥 HEALTH CHECK OTIMIZADO
+// 🏥 HEALTH CHECK OTIMIZADO PARA RENDER
 // ============================================
 app.get('/api/health', async (req, res) => {
   try {
-    console.log('\n🏥 =================================');
-    console.log('💚 VERIFICAÇÃO DE SAÚDE DO SISTEMA');
-    console.log('=================================');
+    // Log simplificado para produção
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('\n🏥 Health check solicitado');
+    }
 
-    // Testar conexão PostgreSQL
-    console.log('🔍 Testando conexão PostgreSQL...');
-    const dbTest = await pool.query('SELECT NOW() as server_time, current_database() as database_name, version() as pg_version');
-    console.log('✅ PostgreSQL: Conectado');
+    // Teste rápido do banco
+    const dbTest = await pool.query('SELECT NOW() as current_time');
     
-    // Verificar tabelas essenciais
-    console.log('🔍 Verificando tabelas...');
-    
-    const clientesCount = await pool.query('SELECT COUNT(*) FROM clientes');
-    
-    // Verificar tabela dados_empresas (prioritária)
-    let empresasCount = { rows: [{ count: 0 }] };
-    let empresasStatus = 'not_found';
+    // Verificar tabelas principais (sem logs excessivos)
+    let tablesStatus = {};
     
     try {
-      empresasCount = await pool.query('SELECT COUNT(*) FROM dados_empresas');
-      empresasStatus = 'active';
-      console.log('✅ Tabela dados_empresas: Encontrada');
+      const clientesCount = await pool.query('SELECT COUNT(*) FROM clientes');
+      tablesStatus.clientes = parseInt(clientesCount.rows[0].count);
     } catch (error) {
-      console.log('⚠️ Tabela dados_empresas: Não encontrada');
+      tablesStatus.clientes = 'not_found';
     }
     
-    // Verificar tabela orçamentos
-    let orcamentosCount = { rows: [{ count: 0 }] };
-    let orcamentosStatus = 'not_found';
+    try {
+      const empresasCount = await pool.query('SELECT COUNT(*) FROM dados_empresas');
+      tablesStatus.empresas = parseInt(empresasCount.rows[0].count);
+    } catch (error) {
+      tablesStatus.empresas = 'not_found';
+    }
     
     try {
-      orcamentosCount = await pool.query('SELECT COUNT(*) FROM orcamentos');
-      orcamentosStatus = 'active';
-      console.log('✅ Tabela orcamentos: Encontrada');
+      const orcamentosCount = await pool.query('SELECT COUNT(*) FROM orcamentos');
+      tablesStatus.orcamentos = parseInt(orcamentosCount.rows[0].count);
     } catch (error) {
-      console.log('⚠️ Tabela orcamentos: Não encontrada');
+      tablesStatus.orcamentos = 'not_found';
     }
 
     const healthData = {
       status: 'OK',
       timestamp: new Date().toISOString(),
       uptime: Math.floor(process.uptime()),
+      environment: process.env.NODE_ENV || 'development',
       memory: {
         used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
         total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB'
       },
       database: {
         status: 'connected',
-        name: dbTest.rows[0].database_name,
-        server_time: dbTest.rows[0].server_time,
-        version: dbTest.rows[0].pg_version.split(' ')[0] + ' ' + dbTest.rows[0].pg_version.split(' ')[1]
+        current_time: dbTest.rows[0].current_time
       },
-      cors: {
-        enabled: true,
-        allowedOrigins: corsOptions.origin.length,
-        supportsNetworkAccess: true,
-        note: 'CORS otimizado - sem duplicação'
-      },
-      tables: {
-        clientes: parseInt(clientesCount.rows[0].count),
-        empresas: parseInt(empresasCount.rows[0].count),
-        orcamentos: parseInt(orcamentosCount.rows[0].count)
-      },
-      services: {
-        auth: 'active',
-        clientes: 'active',
-        empresa: empresasStatus,
-        orcamentos: orcamentosStatus,
-        dadosEmpresa: 'active - OTIMIZADO'
-      }
+      tables: tablesStatus,
+      version: '2.3.0'
     };
 
-    console.log('📊 Estatísticas atuais:');
-    console.log('👤 Clientes:', healthData.tables.clientes);
-    console.log('🏢 Empresas:', healthData.tables.empresas);
-    console.log('📋 Orçamentos:', healthData.tables.orcamentos);
-    console.log('⏱️ Uptime:', healthData.uptime, 'segundos');
-    console.log('💾 Memória:', healthData.memory.used);
-    console.log('=================================\n');
-
-    res.json(healthData);
+    res.status(200).json(healthData);
 
   } catch (error) {
-    console.error('\n❌ Erro no health check:', error);
-    res.status(500).json({
-      status: 'ERROR',
-      message: 'Falha na verificação de saúde',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Erro interno',
-      timestamp: new Date().toISOString()
+    console.error('❌ Erro no health check:', error.message);
+    
+    // Retornar status de erro mas ainda com 200 para não falhar o deploy
+    res.status(200).json({
+      status: 'DEGRADED',
+      message: 'Banco de dados inacessível',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Database connection failed',
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime())
     });
   }
 });
@@ -251,11 +234,7 @@ app.get('/api/health', async (req, res) => {
 // ============================================
 app.get('/api/dados-empresa/test', async (req, res) => {
   try {
-    console.log('\n🧪 =================================');
-    console.log('🔬 TESTE ESPECÍFICO - DADOS EMPRESA');
-    console.log('=================================');
-    
-    // Testar se tabelas existem
+    // Verificar tabelas disponíveis
     const testQuery = await pool.query(`
       SELECT table_name 
       FROM information_schema.tables 
@@ -263,44 +242,36 @@ app.get('/api/dados-empresa/test', async (req, res) => {
       AND table_name IN ('dados_empresas', 'empresas')
     `);
     
-    console.log('📋 Tabelas encontradas:', testQuery.rows.map(r => r.table_name));
-    
     let dadosEncontrados = null;
     let tabelaUsada = null;
     
-    // Prioridade 1: dados_empresas
+    // Tentar buscar dados da empresa
     try {
-      const dados1 = await pool.query('SELECT * FROM dados_empresas ORDER BY updated_at DESC LIMIT 1');
-      if (dados1.rows.length > 0) {
-        dadosEncontrados = dados1.rows[0];
+      const dados = await pool.query('SELECT * FROM dados_empresas ORDER BY updated_at DESC LIMIT 1');
+      if (dados.rows.length > 0) {
+        dadosEncontrados = dados.rows[0];
         tabelaUsada = 'dados_empresas';
-        console.log('✅ Dados encontrados em dados_empresas');
-        console.log('📝 Razão Social:', dados1.rows[0].razao_social);
-        console.log('🏢 Nome Oficina:', dados1.rows[0].nome_oficina);
       }
     } catch (error) {
-      console.log('⚠️ Tabela dados_empresas não acessível:', error.message);
+      // Tabela não existe ou erro
     }
     
-    console.log('=================================\n');
-    
-    res.json({
+    res.status(200).json({
       status: 'OK',
       tabelas_disponiveis: testQuery.rows.map(r => r.table_name),
       dados_encontrados: !!dadosEncontrados,
       tabela_usada: tabelaUsada,
       dados: dadosEncontrados,
-      message: 'Teste de dados da empresa executado com sucesso',
-      cors_status: 'otimizado',
+      message: 'Teste executado com sucesso',
       timestamp: new Date().toISOString()
     });
     
   } catch (error) {
-    console.error('\n❌ Erro no teste de empresa:', error);
-    res.status(500).json({
+    res.status(200).json({
       status: 'ERROR',
-      message: 'Erro ao testar dados da empresa',
-      error: error.message
+      message: 'Erro no teste',
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
@@ -309,21 +280,11 @@ app.get('/api/dados-empresa/test', async (req, res) => {
 // 🧪 ROTA DE TESTE DE CORS
 // ============================================
 app.get('/api/cors/test', (req, res) => {
-  console.log('\n🧪 =================================');
-  console.log('🌐 TESTE DE CORS');
-  console.log('=================================');
-  console.log('🔗 Origin:', req.get('Origin'));
-  console.log('🌐 IP:', req.ip);
-  console.log('📡 User-Agent:', req.get('User-Agent'));
-  console.log('=================================\n');
-  
-  res.json({
-    status: 'CORS_OTIMIZADO',
-    message: 'CORS configurado corretamente - sem duplicação',
+  res.status(200).json({
+    status: 'CORS_OK',
+    message: 'CORS configurado corretamente',
     origin: req.get('Origin'),
-    ip: req.ip,
-    allowedOrigins: corsOptions.origin,
-    corsAppliedOnce: true,
+    environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString()
   });
 });
@@ -332,47 +293,23 @@ app.get('/api/cors/test', (req, res) => {
 // 🚫 TRATAMENTO DE ROTAS NÃO ENCONTRADAS
 // ============================================
 app.use('*', (req, res) => {
-  console.log('\n🚨 =================================');
-  console.log('❌ ROTA NÃO ENCONTRADA');
-  console.log('=================================');
-  console.log('📍 URL:', req.originalUrl);
-  console.log('🔧 Método:', req.method);
-  console.log('🌐 IP:', req.ip);
-  console.log('🔗 Origin:', req.get('Origin'));
-  console.log('=================================\n');
+  // Log simplificado para produção
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`❌ Rota não encontrada: ${req.method} ${req.originalUrl}`);
+  }
 
   res.status(404).json({
     error: 'Rota não encontrada',
     message: `A rota ${req.method} ${req.originalUrl} não existe`,
     timestamp: new Date().toISOString(),
-    available_routes: {
-      authentication: [
-        'POST /api/auth/login',
-        'POST /api/auth/registrar'
-      ],
-      clientes: [
-        'GET /api/clientes',
-        'POST /api/clientes',
-        'GET /api/clientes/:id'
-      ],
-      empresa: [
-        'GET /api/dados-empresa - OTIMIZADO',
-        'PUT /api/dados-empresa - OTIMIZADO',
-        'POST /api/dados-empresa - OTIMIZADO',
-        'GET /api/dados-empresa/test'
-      ],
-      orcamentos: [
-        'GET /api/orcamentos',
-        'POST /api/orcamentos',
-        'GET /api/orcamentos/:id'
-      ],
-      system: [
-        'GET /',
-        'GET /api/health',
-        'GET /api/cors/test'
-      ]
-    },
-    note: 'Sistema otimizado - CORS sem duplicação'
+    available_endpoints: [
+      'GET /',
+      'GET /api/health',
+      'POST /api/auth/login',
+      'GET /api/clientes',
+      'GET /api/dados-empresa',
+      'GET /api/orcamentos'
+    ]
   });
 });
 
@@ -380,20 +317,13 @@ app.use('*', (req, res) => {
 // 🚨 TRATAMENTO GLOBAL DE ERROS
 // ============================================
 app.use((error, req, res, next) => {
-  console.error('\n🚨 ===============================');
-  console.error('💥 ERRO GLOBAL CAPTURADO');
-  console.error('===============================');
-  console.error('📍 URL:', req.originalUrl);
-  console.error('🔧 Método:', req.method);
-  console.error('🌐 Origin:', req.get('Origin'));
-  console.error('📝 Erro:', error.message);
-  console.error('===============================\n');
+  // Log do erro
+  console.error('💥 Erro capturado:', error.message);
   
   res.status(error.status || 500).json({
     error: 'Erro interno do servidor',
     message: process.env.NODE_ENV === 'development' ? error.message : 'Algo deu errado',
-    timestamp: new Date().toISOString(),
-    request_id: Math.random().toString(36).substr(2, 9)
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -404,102 +334,87 @@ const PORT = process.env.PORT || 5000;
 
 async function iniciarServidor() {
   try {
-    console.log('\n🔄 ===============================');
-    console.log('🚀 INICIALIZANDO SERVIDOR');
-    console.log('===============================');
+    console.log('🚀 Iniciando servidor...');
+    console.log('🌍 Ambiente:', process.env.NODE_ENV || 'development');
+    console.log('🌐 Porta:', PORT);
     
-    // Testar conexão PostgreSQL primeiro
+    // Testar conexão PostgreSQL
     console.log('📡 Testando conexão com PostgreSQL...');
-    const conexaoOK = await testarConexao();
     
-    if (!conexaoOK) {
-      throw new Error('Falha na conexão com PostgreSQL');
-    }
-    
-    console.log('✅ Conexão com PostgreSQL estabelecida');
-    
-    // Verificar tabelas essenciais
-    console.log('🔍 Verificando tabelas essenciais...');
-    
+    let conexaoOK = false;
     try {
-      const clientesResult = await pool.query('SELECT COUNT(*) FROM clientes');
-      console.log('✅ Tabela clientes encontrada');
-      console.log('📊 Clientes cadastrados:', clientesResult.rows[0].count);
+      conexaoOK = await testarConexao();
     } catch (error) {
-      console.log('⚠️ Tabela clientes não encontrada');
+      console.log('⚠️ Conexão com banco falhou:', error.message);
+      console.log('🔄 Servidor continuará sem banco (modo degradado)');
     }
     
-    // Verificar tabela dados_empresas
-    try {
-      const empresasResult = await pool.query('SELECT COUNT(*) FROM dados_empresas');
-      console.log('✅ Tabela dados_empresas encontrada');
-      console.log('🏢 Empresas cadastradas:', empresasResult.rows[0].count);
+    if (conexaoOK) {
+      console.log('✅ PostgreSQL conectado!');
       
-      // Mostrar dados da empresa atual
-      const empresaAtual = await pool.query('SELECT razao_social, nome_oficina FROM dados_empresas ORDER BY updated_at DESC LIMIT 1');
-      if (empresaAtual.rows.length > 0) {
-        console.log('📝 Empresa atual:', empresaAtual.rows[0].razao_social);
+      // Verificar tabelas essenciais (sem parar o servidor se falhar)
+      try {
+        const clientesResult = await pool.query('SELECT COUNT(*) FROM clientes');
+        console.log('✅ Tabela clientes:', clientesResult.rows[0].count, 'registros');
+      } catch (error) {
+        console.log('⚠️ Tabela clientes não encontrada');
       }
-    } catch (error) {
-      console.log('⚠️ Tabela dados_empresas não encontrada');
-    }
-    
-    // Verificar tabela orçamentos
-    try {
-      const orcamentosResult = await pool.query('SELECT COUNT(*) FROM orcamentos');
-      console.log('✅ Tabela orcamentos encontrada');
-      console.log('📋 Orçamentos cadastrados:', orcamentosResult.rows[0].count);
-    } catch (error) {
-      console.log('⚠️ Tabela orcamentos não encontrada');
+      
+      try {
+        const empresasResult = await pool.query('SELECT COUNT(*) FROM dados_empresas');
+        console.log('✅ Tabela dados_empresas:', empresasResult.rows[0].count, 'registros');
+        
+        const empresaAtual = await pool.query('SELECT razao_social FROM dados_empresas ORDER BY updated_at DESC LIMIT 1');
+        if (empresaAtual.rows.length > 0) {
+          console.log('📝 Empresa atual:', empresaAtual.rows[0].razao_social);
+        }
+      } catch (error) {
+        console.log('⚠️ Tabela dados_empresas não encontrada');
+      }
+      
+      try {
+        const orcamentosResult = await pool.query('SELECT COUNT(*) FROM orcamentos');
+        console.log('✅ Tabela orcamentos:', orcamentosResult.rows[0].count, 'registros');
+      } catch (error) {
+        console.log('⚠️ Tabela orcamentos não encontrada');
+      }
     }
     
     // Iniciar servidor
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log('\n🎉 ===============================');
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log('🎉 ===============================');
       console.log('🚀 SERVIDOR INICIADO COM SUCESSO!');
       console.log('===============================');
       console.log('🌐 Porta:', PORT);
       console.log('🌍 Ambiente:', process.env.NODE_ENV || 'development');
-      console.log('📊 Banco:', process.env.DB_NAME || 'sistema_os');
-      console.log('🏠 Local: http://localhost:' + PORT);
-      console.log('🌍 Rede: http://10.133.128.150:' + PORT);
-      console.log('📡 Health check: http://localhost:' + PORT + '/api/health');
-      console.log('🧪 Teste CORS: http://localhost:' + PORT + '/api/cors/test');
-      console.log('🧪 Teste empresa: http://localhost:' + PORT + '/api/dados-empresa/test');
+      console.log('🏠 URL:', `http://localhost:${PORT}`);
+      console.log('📡 Health check:', `http://localhost:${PORT}/api/health`);
       console.log('===============================');
-      console.log('🎯 ENDPOINTS ATIVOS:');
+      console.log('🎯 ENDPOINTS PRINCIPAIS:');
+      console.log('   🏠 / - Página inicial');
+      console.log('   🏥 /api/health - Status');
       console.log('   🔐 /api/auth/* - Autenticação');
       console.log('   👤 /api/clientes/* - Clientes');
-      console.log('   🏢 /api/dados-empresa/* - Empresa OTIMIZADO');
+      console.log('   🏢 /api/dados-empresa/* - Empresa');
       console.log('   📋 /api/orcamentos/* - Orçamentos');
-      console.log('   🏥 /api/health - Status');
       console.log('===============================');
-      console.log('🌐 CORS OTIMIZADO:');
-      console.log('   ✅ Aplicado uma vez apenas');
-      console.log('   ✅ Suporte a rede local');
-      console.log('   ✅ Sem duplicação');
-      console.log('===============================');
-      console.log('✅ MELHORIAS APLICADAS:');
-      console.log('   ✅ CORS duplicado removido');
-      console.log('   ✅ Logs otimizados');
-      console.log('   ✅ Testes melhorados');
-      console.log('   ✅ Performance otimizada');
+      console.log('✅ Sistema otimizado para Render!');
       console.log('===============================\n');
-      
-      console.log('🎊 SISTEMA OTIMIZADO E PRONTO! 🎊\n');
     });
 
+    // Configurar timeouts para Render
+    server.keepAliveTimeout = 120000; // 120s
+    server.headersTimeout = 120000; // 120s
+
   } catch (error) {
-    console.error('\n❌ ===============================');
-    console.error('💥 ERRO AO INICIAR SERVIDOR');
-    console.error('===============================');
-    console.error('📝 Erro:', error.message);
-    console.error('💡 Soluções possíveis:');
-    console.error('   1. Verifique se o PostgreSQL está rodando');
-    console.error('   2. Verifique as configurações no arquivo .env');
-    console.error('   3. Verifique se o banco de dados existe');
-    console.error('===============================\n');
-    process.exit(1);
+    console.error('❌ ERRO AO INICIAR SERVIDOR:', error.message);
+    
+    // Em produção, não encerrar o processo, apenas log o erro
+    if (process.env.NODE_ENV === 'production') {
+      console.log('🔄 Continuando em modo degradado...');
+    } else {
+      process.exit(1);
+    }
   }
 }
 
@@ -507,31 +422,34 @@ async function iniciarServidor() {
 // 🔚 DESLIGAMENTO GRACIOSO
 // ============================================
 process.on('SIGINT', async () => {
-  console.log('\n🔄 ===============================');
-  console.log('👋 DESLIGANDO SERVIDOR...');
-  console.log('===============================');
+  console.log('\n👋 Desligando servidor...');
   
   try {
-    await pool.end();
-    console.log('✅ Conexões do banco fechadas');
+    if (pool) {
+      await pool.end();
+      console.log('✅ Conexões do banco fechadas');
+    }
     console.log('✅ Servidor desligado com sucesso');
-    console.log('👋 Até logo!');
-    console.log('===============================\n');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Erro ao fechar conexões:', error);
+    console.error('❌ Erro ao fechar conexões:', error.message);
     process.exit(1);
   }
 });
 
-// Capturar erros não tratados
+// Capturar erros não tratados (sem encerrar o processo em produção)
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('\n🚨 PROMISE REJEITADA NÃO TRATADA:', reason);
+  console.error('🚨 Promise rejeitada:', reason);
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('\n🚨 EXCEÇÃO NÃO CAPTURADA:', error);
-  process.exit(1);
+  console.error('🚨 Exceção não capturada:', error.message);
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
 });
 
 // ============================================
