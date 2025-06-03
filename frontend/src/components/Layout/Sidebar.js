@@ -14,11 +14,12 @@ import {
   Dashboard as DashboardIcon,
   People as PeopleIcon,
   Receipt as ReceiptIcon,
-  Settings as SettingsIcon,
-  SupervisorAccount as UsersIcon
+  Settings as SettingsIcon
+  // ✅ REMOVIDO: SupervisorAccount as UsersIcon - não é mais necessário
 } from '@mui/icons-material';
 import authService from '../../services/authService';
 
+// ✅ MENU LIMPO: Apenas funcionalidades que funcionam perfeitamente
 const menuItems = [
   {
     text: 'Dashboard',
@@ -38,12 +39,13 @@ const menuItems = [
     path: '/orcamentos',
     adminOnly: false
   },
-  {
-    text: 'Usuários',
-    icon: <UsersIcon />,
-    path: '/usuarios',
-    adminOnly: true
-  },
+  // ✅ REMOVIDO: Objeto inteiro da aba "Usuários" (linhas 32-36)
+  // {
+  //   text: 'Usuários',
+  //   icon: <UsersIcon />,
+  //   path: '/usuarios',
+  //   adminOnly: true
+  // },
   {
     text: 'Administração',
     icon: <SettingsIcon />,
@@ -115,24 +117,15 @@ function Sidebar() {
         ))}
       </List>
 
-      {/* Footer com info do usuário */}
-      <Box sx={{ 
-        position: 'absolute', 
-        bottom: 16, 
-        left: 16, 
-        right: 16,
-        p: 2,
-        bgcolor: 'grey.50',
-        borderRadius: 1
-      }}>
-        <Typography variant="caption" color="textSecondary">
-          Oficina Macedo
-        </Typography>
-        <br />
-        <Typography variant="caption" color="textSecondary">
-          v1.0.0
-        </Typography>
-      </Box>
+      {/* ✅ REMOVIDO: Footer com "Oficina Macedo v1.0.0" */}
+      {/* 
+      Aqui estava a faixa cinza que foi removida:
+      - Box com position absolute
+      - Typography com "Oficina Macedo"
+      - Typography com "v1.0.0"
+      
+      Agora a sidebar fica mais limpa e profissional!
+      */}
     </Box>
   );
 }

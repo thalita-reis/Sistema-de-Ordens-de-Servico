@@ -34,6 +34,7 @@ function OrcamentoForm() {
   const { id } = useParams();
   const isEdit = !!id;
   const [loading, setLoading] = useState(false);
+  // ✅ CORREÇÃO 1: Estado inicial como array vazio
   const [clientes, setClientes] = useState([]);
   const [loadingClientes, setLoadingClientes] = useState(true);
   const [itens, setItens] = useState([]);
@@ -88,23 +89,94 @@ function OrcamentoForm() {
     }
   }, [id]);
 
+  // ✅ CORREÇÃO 2: Função carregarClientes com tratamento robusto
   const carregarClientes = async () => {
     try {
       setLoadingClientes(true);
+      console.log('🔍 OrcamentoForm.carregarClientes - Iniciando...');
+      
       const response = await clienteService.listar({ limit: 1000 });
-      setClientes(response.data.clientes);
+      
+      console.log('📦 Resposta clientes:', response);
+      console.log('📊 response.data:', response.data);
+
+      // ✅ CORREÇÃO 3: Tratamento robusto da resposta de clientes
+      let clientesData = [];
+
+      if (response && response.data) {
+        // Caso 1: response.data.clientes (formato esperado)
+        if (response.data.clientes && Array.isArray(response.data.clientes)) {
+          clientesData = response.data.clientes;
+          console.log('✅ Clientes formato 1: response.data.clientes');
+        }
+        // Caso 2: response.data é array direto
+        else if (Array.isArray(response.data)) {
+          clientesData = response.data;
+          console.log('✅ Clientes formato 2: response.data como array');
+        }
+        // Caso 3: response.data.data (formato alternativo)
+        else if (response.data.data && Array.isArray(response.data.data)) {
+          clientesData = response.data.data;
+          console.log('✅ Clientes formato 3: response.data.data');
+        }
+        else {
+          console.log('⚠️ Estrutura de clientes não reconhecida:', response.data);
+          clientesData = [];
+        }
+      } else {
+        console.log('❌ response de clientes não existe');
+        clientesData = [];
+      }
+
+      console.log('✅ Clientes carregados:', clientesData.length);
+      setClientes(Array.isArray(clientesData) ? clientesData : []);
+
     } catch (error) {
+      console.error('❌ Erro ao carregar clientes:', error);
       toast.error('Erro ao carregar clientes');
+      setClientes([]); // ✅ Estado seguro em caso de erro
     } finally {
       setLoadingClientes(false);
     }
   };
 
+  // ✅ CORREÇÃO 4: Função carregarOrcamento com tratamento robusto
   const carregarOrcamento = async () => {
     try {
       setLoading(true);
+      console.log('🔍 OrcamentoForm.carregarOrcamento - ID:', id);
+      
       const response = await orcamentoService.buscarPorId(id);
-      const orcamento = response.data;
+      
+      console.log('📦 Resposta orçamento:', response);
+
+      // ✅ CORREÇÃO 5: Extrair dados do orçamento de forma segura
+      let orcamento = null;
+
+      if (response && response.data) {
+        // Caso 1: response.data é o orçamento direto
+        if (response.data.id || response.data.numero) {
+          orcamento = response.data;
+          console.log('✅ Orçamento formato 1: response.data direto');
+        }
+        // Caso 2: response.data.data contém o orçamento
+        else if (response.data.data && (response.data.data.id || response.data.data.numero)) {
+          orcamento = response.data.data;
+          console.log('✅ Orçamento formato 2: response.data.data');
+        }
+        else {
+          console.log('❌ Estrutura de orçamento não reconhecida:', response.data);
+          throw new Error('Orçamento não encontrado ou estrutura inválida');
+        }
+      } else {
+        throw new Error('Resposta inválida do servidor');
+      }
+
+      if (!orcamento) {
+        throw new Error('Orçamento não encontrado');
+      }
+
+      console.log('✅ Orçamento carregado:', orcamento.numero);
       
       // Carregar todos os campos
       Object.keys(orcamento).forEach(key => {
@@ -115,10 +187,17 @@ function OrcamentoForm() {
         }
       });
       
-      if (orcamento.itens && orcamento.itens.length > 0) {
+      // ✅ CORREÇÃO 6: Tratar itens de forma segura
+      if (orcamento.itens && Array.isArray(orcamento.itens) && orcamento.itens.length > 0) {
         setItens(orcamento.itens);
+        console.log('✅ Itens carregados:', orcamento.itens.length);
+      } else {
+        setItens([]);
+        console.log('ℹ️ Nenhum item encontrado no orçamento');
       }
+
     } catch (error) {
+      console.error('❌ Erro ao carregar orçamento:', error);
       toast.error('Erro ao carregar orçamento');
       navigate('/orcamentos');
     } finally {
@@ -168,6 +247,7 @@ function OrcamentoForm() {
       }
 
       setLoading(true);
+      console.log('💾 Salvando orçamento...', { isEdit, data });
       
       const dadosOrcamento = {
         ...data,
@@ -186,16 +266,25 @@ function OrcamentoForm() {
       
       navigate('/orcamentos');
     } catch (error) {
+      console.error('❌ Erro ao salvar orçamento:', error);
       toast.error('Erro ao salvar orçamento');
-      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ CORREÇÃO 7: Verificação de loading mais robusta
   if ((loading || loadingClientes) && isEdit) {
     return <LoadingSpinner />;
   }
+
+  console.log('🎯 Renderização OrcamentoForm:', {
+    loading,
+    loadingClientes,
+    clientes: clientes?.length || 0,
+    itens: itens?.length || 0,
+    isEdit
+  });
 
   return (
     <Box>
@@ -221,20 +310,23 @@ function OrcamentoForm() {
                     render={({ field }) => (
                       <Autocomplete
                         {...field}
-                        options={clientes}
-                        getOptionLabel={(option) => option.nome}
+                        // ✅ CORREÇÃO 8: Garantir que options é sempre array
+                        options={Array.isArray(clientes) ? clientes : []}
+                        getOptionLabel={(option) => option.nome || 'Nome não disponível'}
                         value={clientes.find(c => c.id === field.value) || null}
                         onChange={(_, newValue) => {
                           field.onChange(newValue ? newValue.id : null);
                         }}
+                        loading={loadingClientes}
                         renderInput={(params) => (
                           <TextField
                             {...params}
                             label="Cliente"
                             error={!!errors.cliente_id}
-                            helperText={errors.cliente_id?.message}
+                            helperText={errors.cliente_id?.message || (loadingClientes ? 'Carregando clientes...' : '')}
                           />
                         )}
+                        noOptionsText={loadingClientes ? "Carregando..." : "Nenhum cliente encontrado"}
                       />
                     )}
                   />
@@ -499,7 +591,8 @@ function OrcamentoForm() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {itens.length === 0 ? (
+                    {/* ✅ CORREÇÃO 9: Verificação dupla do array de itens */}
+                    {!Array.isArray(itens) || itens.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={5} align="center">
                           Nenhum item adicionado

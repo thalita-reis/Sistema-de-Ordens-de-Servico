@@ -1,247 +1,388 @@
-const { pool } = require('../config/database'); // Importa a conexão PostgreSQL
+const database = require('../config/database');
 
 class ClienteService {
-  
+  // LISTAR TODOS OS CLIENTES
+  async listarTodos() {
+    try {
+      const query = `
+        SELECT 
+          id,
+          nome,
+          cpf,
+          email,
+          telefone,
+          celular,
+          fax,
+          rua,
+          numero,
+          cep,
+          bairro,
+          cidade,
+          uf,
+          complemento,
+          pessoa_juridica,
+          observacoes_gerais,
+          ficha_inativa,
+          ativo,
+          data_inclusao,
+          created_at,
+          updated_at,
+          CASE 
+            WHEN rua IS NOT NULL THEN 
+              CONCAT(rua, 
+                     CASE WHEN numero IS NOT NULL THEN ', ' || numero ELSE '' END,
+                     CASE WHEN bairro IS NOT NULL THEN ' - ' || bairro ELSE '' END,
+                     CASE WHEN cidade IS NOT NULL THEN ', ' || cidade ELSE '' END,
+                     CASE WHEN uf IS NOT NULL THEN '/' || uf ELSE '' END)
+            ELSE 'Endereço não informado'
+          END as endereco_completo
+        FROM clientes 
+        WHERE (ativo = true OR ativo IS NULL) AND (ficha_inativa = false OR ficha_inativa IS NULL)
+        ORDER BY nome ASC
+      `;
+      
+      const result = await database.query(query);
+      return result.rows;
+    } catch (error) {
+      console.error('Erro ao listar clientes:', error);
+      throw new Error('Erro ao carregar lista de clientes');
+    }
+  }
+
+  // BUSCAR CLIENTE POR CPF (CHAVE ÚNICA)
+  async buscarPorCpf(cpf) {
+    try {
+      // Limpar CPF (remover formatação)
+      const cpfLimpo = cpf.replace(/[^\d]/g, '');
+      
+      const query = `
+        SELECT * FROM clientes 
+        WHERE cpf = $1 AND (ativo = true OR ativo IS NULL) AND (ficha_inativa = false OR ficha_inativa IS NULL)
+      `;
+      
+      const result = await database.query(query, [cpfLimpo]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Erro ao buscar cliente por CPF:', error);
+      throw new Error('Erro ao buscar cliente');
+    }
+  }
+
+  // BUSCAR CLIENTE POR ID (COMPATIBILIDADE)
+  async buscarPorId(id) {
+    try {
+      const query = `
+        SELECT 
+          *,
+          CASE 
+            WHEN rua IS NOT NULL THEN 
+              CONCAT(rua, 
+                     CASE WHEN numero IS NOT NULL THEN ', ' || numero ELSE '' END,
+                     CASE WHEN bairro IS NOT NULL THEN ' - ' || bairro ELSE '' END,
+                     CASE WHEN cidade IS NOT NULL THEN ', ' || cidade ELSE '' END,
+                     CASE WHEN uf IS NOT NULL THEN '/' || uf ELSE '' END)
+            ELSE 'Endereço não informado'
+          END as endereco_completo
+        FROM clientes 
+        WHERE id = $1 AND (ativo = true OR ativo IS NULL) AND (ficha_inativa = false OR ficha_inativa IS NULL)
+      `;
+      
+      const result = await database.query(query, [id]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Erro ao buscar cliente por ID:', error);
+      throw new Error('Erro ao buscar cliente');
+    }
+  }
+
+  // BUSCAR OU CRIAR CLIENTE (FUNCIONALIDADE PRINCIPAL)
   async buscarOuCriar(dadosCliente) {
     try {
-      const { cpf, nome, email, telefone, endereco, empresa_id } = dadosCliente;
+      const cpfLimpo = dadosCliente.cpf.replace(/[^\d]/g, '');
       
-      // Primeiro, busca se já existe
-      let resultado = await pool.query(
-        'SELECT * FROM clientes WHERE cpf = $1',
-        [cpf]
-      );
+      // Primeiro, verificar se cliente já existe
+      let cliente = await this.buscarPorCpf(cpfLimpo);
       
-      if (resultado.rows.length > 0) {
-        const cliente = resultado.rows[0];
-        
-        // Se estava inativo, reativa
-        if (!cliente.ativo) {
-          await pool.query(
-            'UPDATE clientes SET ativo = true, updated_at = NOW() WHERE cpf = $1',
-            [cpf]
-          );
-          cliente.ativo = true;
-        }
-        
+      if (cliente) {
         return {
           sucesso: true,
-          cliente,
+          cliente: cliente,
           jaCadastrado: true,
-          mensagem: 'Cliente já cadastrado no sistema'
+          mensagem: `Cliente já existe: ${cliente.nome}`
         };
       }
       
-      // Cliente não existe, cria novo
-      resultado = await pool.query(`
-        INSERT INTO clientes (cpf, nome, email, telefone, endereco, empresa_id) 
-        VALUES ($1, $2, $3, $4, $5, $6) 
-        RETURNING *
-      `, [cpf, nome, email, telefone, endereco, empresa_id]);
+      // Se não existe, criar novo cliente
+      const novoCliente = await this.criar({
+        ...dadosCliente,
+        cpf: cpfLimpo
+      });
       
       return {
         sucesso: true,
-        cliente: resultado.rows[0],
+        cliente: novoCliente,
         jaCadastrado: false,
-        mensagem: 'Cliente criado com sucesso'
+        mensagem: 'Cliente cadastrado com sucesso'
       };
       
     } catch (error) {
-      console.error('Erro no ClienteService.buscarOuCriar:', error);
-      
-      if (error.code === '23505') {
-        return {
-          sucesso: false,
-          erro: 'CPF já cadastrado no sistema'
-        };
-      }
-      
+      console.error('Erro em buscarOuCriar:', error);
       return {
         sucesso: false,
-        erro: 'Erro interno do serviço'
+        erro: error.message,
+        mensagem: 'Erro ao processar cliente'
       };
     }
   }
-  
-  async buscarPorCpf(cpf) {
+
+  // VERIFICAR SE CPF EXISTE (para API)
+  async verificarCpfExiste(cpf) {
     try {
-      const resultado = await pool.query(
-        'SELECT * FROM clientes WHERE cpf = $1 AND ativo = true',
-        [cpf]
-      );
-      
-      return resultado.rows[0] || null;
-      
+      const cliente = await this.buscarPorCpf(cpf);
+      return {
+        existe: !!cliente,
+        cliente: cliente
+      };
     } catch (error) {
-      console.error('Erro ao buscar cliente por CPF:', error);
-      throw error;
+      console.error('Erro ao verificar CPF:', error);
+      throw new Error('Erro ao verificar CPF');
     }
   }
-  
-  async buscarPorId(id) {
-    try {
-      const resultado = await pool.query(
-        'SELECT * FROM clientes WHERE id = $1 AND ativo = true',
-        [id]
-      );
-      
-      return resultado.rows[0] || null;
-      
-    } catch (error) {
-      console.error('Erro ao buscar cliente por ID:', error);
-      throw error;
-    }
-  }
-  
-  async listarPorEmpresa(empresaId, opcoes = {}) {
-    try {
-      const { 
-        limite = 50, 
-        offset = 0, 
-        busca = '', 
-        apenasAtivos = true 
-      } = opcoes;
-      
-      let query = 'SELECT * FROM clientes WHERE empresa_id = $1';
-      let params = [empresaId];
-      
-      if (apenasAtivos) {
-        query += ' AND ativo = true';
-      }
-      
-      if (busca) {
-        query += ` AND (nome ILIKE $${params.length + 1} OR cpf ILIKE $${params.length + 1})`;
-        params.push(`%${busca}%`);
-      }
-      
-      query += ` ORDER BY nome LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-      params.push(limite, offset);
-      
-      const resultado = await pool.query(query, params);
-      return resultado.rows;
-      
-    } catch (error) {
-      console.error('Erro ao listar clientes:', error);
-      throw error;
-    }
-  }
-  
+
+  // CRIAR NOVO CLIENTE
   async criar(dadosCliente) {
     try {
-      const { cpf, nome, email, telefone, endereco, empresa_id = 1 } = dadosCliente;
+      const cpfLimpo = dadosCliente.cpf.replace(/[^\d]/g, '');
       
-      const resultado = await pool.query(`
-        INSERT INTO clientes (cpf, nome, email, telefone, endereco, empresa_id) 
-        VALUES ($1, $2, $3, $4, $5, $6) 
-        RETURNING *
-      `, [cpf, nome, email, telefone, endereco, empresa_id]);
+      // Verificar se CPF já existe
+      const clienteExistente = await this.buscarPorCpf(cpfLimpo);
+      if (clienteExistente) {
+        throw new Error('Cliente com este CPF já existe');
+      }
       
-      return resultado.rows[0];
+      const query = `
+        INSERT INTO clientes (
+          nome, cpf, data_inclusao, telefone, celular, fax,
+          rua, numero, cep, bairro, cidade, uf, email,
+          pessoa_juridica, observacoes_gerais, ficha_inativa,
+          complemento, empresa_id, ativo, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+          $14, $15, $16, $17, $18, $19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        ) RETURNING *
+      `;
+      
+      const valores = [
+        dadosCliente.nome,
+        cpfLimpo,
+        dadosCliente.data_inclusao || new Date(),
+        dadosCliente.telefone || null,
+        dadosCliente.celular || null,
+        dadosCliente.fax || null,
+        dadosCliente.rua || null,
+        dadosCliente.numero || null,
+        dadosCliente.cep || null,
+        dadosCliente.bairro || null,
+        dadosCliente.cidade || null,
+        dadosCliente.uf || null,
+        dadosCliente.email || null,
+        dadosCliente.pessoa_juridica || false,
+        dadosCliente.observacoes_gerais || null,
+        false, // ficha_inativa
+        dadosCliente.complemento || null,
+        dadosCliente.empresa_id || 1, // Empresa padrão
+        true // ativo
+      ];
+      
+      const result = await database.query(query, valores);
+      return result.rows[0];
       
     } catch (error) {
       console.error('Erro ao criar cliente:', error);
-      throw error;
+      throw new Error('Erro ao cadastrar cliente: ' + error.message);
     }
   }
-  
-  async atualizar(cpf, dadosAtualizacao) {
+
+  // ATUALIZAR CLIENTE
+  async atualizar(id, dadosCliente) {
     try {
-      const { nome, email, telefone, endereco } = dadosAtualizacao;
-      
-      const resultado = await pool.query(`
-        UPDATE clientes 
-        SET nome = $1, email = $2, telefone = $3, endereco = $4, updated_at = NOW()
-        WHERE cpf = $5 AND ativo = true
+      const query = `
+        UPDATE clientes SET
+          nome = $2,
+          cpf = $3,
+          telefone = $4,
+          celular = $5,
+          fax = $6,
+          rua = $7,
+          numero = $8,
+          cep = $9,
+          bairro = $10,
+          cidade = $11,
+          uf = $12,
+          email = $13,
+          pessoa_juridica = $14,
+          observacoes_gerais = $15,
+          complemento = $16,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1 AND (ativo = true OR ativo IS NULL)
         RETURNING *
-      `, [nome, email, telefone, endereco, cpf]);
+      `;
       
-      if (resultado.rows.length === 0) {
-        return {
-          sucesso: false,
-          erro: 'Cliente não encontrado'
-        };
+      const valores = [
+        id,
+        dadosCliente.nome,
+        dadosCliente.cpf ? dadosCliente.cpf.replace(/[^\d]/g, '') : null,
+        dadosCliente.telefone,
+        dadosCliente.celular,
+        dadosCliente.fax,
+        dadosCliente.rua,
+        dadosCliente.numero,
+        dadosCliente.cep,
+        dadosCliente.bairro,
+        dadosCliente.cidade,
+        dadosCliente.uf,
+        dadosCliente.email,
+        dadosCliente.pessoa_juridica || false,
+        dadosCliente.observacoes_gerais,
+        dadosCliente.complemento
+      ];
+      
+      const result = await database.query(query, valores);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Cliente não encontrado');
       }
       
-      return {
-        sucesso: true,
-        cliente: resultado.rows[0],
-        mensagem: 'Cliente atualizado com sucesso'
-      };
+      return result.rows[0];
       
     } catch (error) {
       console.error('Erro ao atualizar cliente:', error);
-      throw error;
+      throw new Error('Erro ao atualizar cliente: ' + error.message);
     }
   }
-  
-  async desativar(cpf) {
+
+  // INATIVAR CLIENTE (em vez de deletar)
+  async inativar(id) {
     try {
-      const resultado = await pool.query(
-        'UPDATE clientes SET ativo = false, updated_at = NOW() WHERE cpf = $1 RETURNING id',
-        [cpf]
-      );
+      const query = `
+        UPDATE clientes SET
+          ficha_inativa = true,
+          ativo = false,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING *
+      `;
       
-      return resultado.rows.length > 0;
+      const result = await database.query(query, [id]);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Cliente não encontrado');
+      }
+      
+      return result.rows[0];
       
     } catch (error) {
-      console.error('Erro ao desativar cliente:', error);
-      throw error;
+      console.error('Erro ao inativar cliente:', error);
+      throw new Error('Erro ao inativar cliente');
     }
   }
-  
-  async buscarHistoricoCompleto(cpf) {
+
+  // DELETAR CLIENTE
+  async deletar(id) {
     try {
+      const query = 'DELETE FROM clientes WHERE id = $1 RETURNING *';
+      const result = await database.query(query, [id]);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Cliente não encontrado');
+      }
+      
+      return result.rows[0];
+      
+    } catch (error) {
+      console.error('Erro ao deletar cliente:', error);
+      throw new Error('Erro ao deletar cliente');
+    }
+  }
+
+  // BUSCAR CLIENTES COM ORÇAMENTOS
+  async buscarComOrcamentos(cpf) {
+    try {
+      const cpfLimpo = cpf.replace(/[^\d]/g, '');
+      
       const query = `
         SELECT 
           c.*,
-          COALESCE(
-            json_agg(
-              json_build_object(
-                'id', os.id,
-                'numero', os.numero,
-                'descricao', os.descricao,
-                'status', os.status,
-                'valor_total', os.valor_total,
-                'data_criacao', os.created_at
-              ) ORDER BY os.created_at DESC
-            ) FILTER (WHERE os.id IS NOT NULL), 
-            '[]'
-          ) as ordens_servico
+          COUNT(o.id) as total_orcamentos,
+          COALESCE(SUM(o.valor_total), 0) as valor_total_orcamentos
         FROM clientes c
-        LEFT JOIN ordens_servico os ON c.id = os.cliente_id
-        WHERE c.cpf = $1
+        LEFT JOIN orcamentos o ON (c.cpf = o.cliente_cpf OR c.id = o.cliente_id)
+        WHERE c.cpf = $1 AND (c.ativo = true OR c.ativo IS NULL)
         GROUP BY c.id
       `;
       
-      const resultado = await pool.query(query, [cpf]);
-      return resultado.rows[0] || null;
+      const result = await database.query(query, [cpfLimpo]);
+      return result.rows[0] || null;
       
     } catch (error) {
-      console.error('Erro ao buscar histórico completo:', error);
-      throw error;
+      console.error('Erro ao buscar cliente com orçamentos:', error);
+      throw new Error('Erro ao buscar histórico do cliente');
     }
   }
-  
-  async obterEstatisticas(empresaId) {
+
+  // PESQUISAR CLIENTES
+  async pesquisar(termo) {
     try {
       const query = `
-        SELECT 
-          COUNT(*) as total_clientes,
-          COUNT(*) FILTER (WHERE ativo = true) as clientes_ativos,
-          COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '30 days') as novos_mes,
-          COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as novos_semana
-        FROM clientes 
-        WHERE empresa_id = $1
+        SELECT * FROM clientes 
+        WHERE (ativo = true OR ativo IS NULL) AND (ficha_inativa = false OR ficha_inativa IS NULL) AND (
+          nome ILIKE $1 OR 
+          cpf LIKE $1 OR 
+          email ILIKE $1 OR
+          telefone LIKE $1 OR
+          celular LIKE $1
+        )
+        ORDER BY nome ASC
+        LIMIT 50
       `;
       
-      const resultado = await pool.query(query, [empresaId]);
-      return resultado.rows[0];
+      const result = await database.query(query, [`%${termo}%`]);
+      return result.rows;
       
     } catch (error) {
-      console.error('Erro ao obter estatísticas:', error);
-      throw error;
+      console.error('Erro ao pesquisar clientes:', error);
+      throw new Error('Erro na pesquisa de clientes');
     }
+  }
+
+  // FORMATAR CPF PARA EXIBIÇÃO
+  formatarCpf(cpf) {
+    if (!cpf) return '';
+    const cpfLimpo = cpf.replace(/[^\d]/g, '');
+    return cpfLimpo.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  }
+
+  // LIMPAR CPF
+  limparCpf(cpf) {
+    if (!cpf) return '';
+    return cpf.replace(/[^\d]/g, '');
+  }
+
+  // VALIDAR CPF
+  validarCpf(cpf) {
+    const cpfLimpo = cpf.replace(/[^\d]/g, '');
+    
+    if (cpfLimpo.length !== 11) {
+      return false;
+    }
+    
+    // Validação básica (todos os dígitos iguais)
+    if (/^(\d)\1+$/.test(cpfLimpo)) {
+      return false;
+    }
+    
+    return true;
   }
 }
 
-module.exports = ClienteService;
+module.exports = new ClienteService();

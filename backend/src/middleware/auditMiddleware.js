@@ -1,4 +1,4 @@
-const { HistoricoAlteracao } = require('../models');
+// // // // // const { HistoricoAlteracao } = require('../models'); // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE
 
 module.exports = {
   async registrarAlteracao(tabela, registroId, acao, dados, usuarioId) {

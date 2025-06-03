@@ -18,10 +18,10 @@ class OrcamentoController {
           c.cpf as cliente_cpf,
           c.email as cliente_email,
           c.telefone as cliente_telefone,
-          o.data_criacao,
+          o.data_orcamento,
           o.data_validade,
           o.valor_total,
-          o.total_desconto,
+          o.desconto,
           o.valor_final,
           o.status,
           o.observacoes,
@@ -36,28 +36,11 @@ class OrcamentoController {
       const result = await database.query(query);
       
       console.log('✅ Orçamentos encontrados:', result.rows.length);
-      console.log('🔍 Primeiro orçamento (debug):', result.rows[0]);
-
-      // ✅ CORREÇÃO PRINCIPAL: Formatar dados para múltipla compatibilidade
-      const dadosFormatados = result.rows.map(row => ({
-        ...row,
-        // Garantir que todos os formatos de cliente existam
-        cliente: row.cliente_nome ? { 
-          nome: row.cliente_nome,
-          cpf: row.cliente_cpf,
-          email: row.cliente_email,
-          telefone: row.cliente_telefone
-        } : null,
-        nome_cliente: row.cliente_nome,
-        nomeCliente: row.cliente_nome
-      }));
-
-      console.log('✅ Dados formatados (debug):', dadosFormatados[0]);
       
       // Resposta compatível com frontend
       res.json({
-        data: dadosFormatados,
-        total: dadosFormatados.length,
+        data: result.rows,
+        total: result.rows.length,
         success: true
       });
       
@@ -116,10 +99,10 @@ class OrcamentoController {
           c.cpf as cliente_cpf,
           c.email as cliente_email,
           c.telefone as cliente_telefone,
-          o.data_criacao,
+          o.data_orcamento,
           o.data_validade,
           o.valor_total,
-          o.total_desconto,
+          o.desconto,
           o.valor_final,
           o.status,
           o.observacoes,
@@ -143,23 +126,10 @@ class OrcamentoController {
       const totalPages = Math.ceil(total / parseInt(limit));
       
       console.log('✅ Orçamentos encontrados:', dataResult.rows.length, 'de', total, 'total');
-
-      // ✅ Formatar dados para compatibilidade
-      const dadosFormatados = dataResult.rows.map(row => ({
-        ...row,
-        cliente: row.cliente_nome ? { 
-          nome: row.cliente_nome,
-          cpf: row.cliente_cpf,
-          email: row.cliente_email,
-          telefone: row.cliente_telefone
-        } : null,
-        nome_cliente: row.cliente_nome,
-        nomeCliente: row.cliente_nome
-      }));
       
       // Estrutura compatível com frontend
       const response = {
-        data: dadosFormatados,
+        data: dataResult.rows,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -230,8 +200,8 @@ class OrcamentoController {
       // Inserir orçamento
       const query = `
         INSERT INTO orcamentos (
-          numero, cliente_id, data_criacao, data_validade,
-          valor_total, total_desconto, valor_final, status, observacoes,
+          numero, cliente_id, data_orcamento, data_validade,
+          valor_total, desconto, valor_final, status, observacoes,
           created_at, updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -241,10 +211,10 @@ class OrcamentoController {
       const valores = [
         numero,
         dadosOrcamento.cliente_id,
-        dadosOrcamento.data_criacao || new Date(),
+        dadosOrcamento.data_orcamento || new Date(),
         dadosOrcamento.data_validade,
         dadosOrcamento.valor_total || 0,
-        dadosOrcamento.total_desconto || 0,
+        dadosOrcamento.desconto || 0,
         dadosOrcamento.valor_final || 0,
         dadosOrcamento.status || 'rascunho',
         dadosOrcamento.observacoes || ''
@@ -314,8 +284,8 @@ class OrcamentoController {
       let paramCount = 0;
       
       const camposPermitidos = [
-        'numero', 'cliente_id', 'data_criacao', 'data_validade',
-        'valor_total', 'total_desconto', 'valor_final', 'status', 'observacoes'
+        'numero', 'cliente_id', 'data_orcamento', 'data_validade',
+        'valor_total', 'desconto', 'valor_final', 'status', 'observacoes'
       ];
       
       camposPermitidos.forEach(campo => {
@@ -414,17 +384,10 @@ class OrcamentoController {
           c.cpf as cliente_cpf,
           c.email as cliente_email,
           c.telefone as cliente_telefone,
-          c.rua as cliente_rua,
-          c.numero as cliente_numero,
-          c.complemento as cliente_complemento,
-          c.bairro as cliente_bairro,
-          c.cidade as cliente_cidade,
-          c.uf as cliente_uf,
-          c.cep as cliente_cep,
-          o.data_criacao,
+          o.data_orcamento,
           o.data_validade,
           o.valor_total,
-          o.total_desconto,
+          o.desconto,
           o.valor_final,
           o.status,
           o.observacoes,
@@ -440,32 +403,11 @@ class OrcamentoController {
       if (result.rows.length === 0) {
         return res.status(404).json({ erro: 'Orçamento não encontrado' });
       }
-
-      // ✅ Formatar dados com objeto cliente estruturado
-      const orcamento = result.rows[0];
-      const dadosFormatados = {
-        ...orcamento,
-        cliente: orcamento.cliente_nome ? {
-          nome: orcamento.cliente_nome,
-          cpf: orcamento.cliente_cpf,
-          email: orcamento.cliente_email,
-          telefone: orcamento.cliente_telefone,
-          rua: orcamento.cliente_rua,
-          numero: orcamento.cliente_numero,
-          complemento: orcamento.cliente_complemento,
-          bairro: orcamento.cliente_bairro,
-          cidade: orcamento.cliente_cidade,
-          uf: orcamento.cliente_uf,
-          cep: orcamento.cliente_cep
-        } : null,
-        nome_cliente: orcamento.cliente_nome,
-        nomeCliente: orcamento.cliente_nome
-      };
       
-      console.log('✅ Orçamento encontrado:', dadosFormatados.numero);
+      console.log('✅ Orçamento encontrado:', result.rows[0].numero);
       
       res.json({
-        data: dadosFormatados,
+        data: result.rows[0],
         success: true
       });
       
@@ -541,9 +483,8 @@ class OrcamentoController {
         totalOrcamentos: parseInt(totalOrcamentos),
         database: database.options?.database || 'conectado',
         timestamp: new Date().toISOString(),
-        version: '3.0 - Versão final com cliente corrigido',
-        estrutura_corrigida: true,
-        cliente_funcionando: true
+        version: '2.0 - Usando apenas cliente_id',
+        estrutura_corrigida: true
       });
       
     } catch (error) {

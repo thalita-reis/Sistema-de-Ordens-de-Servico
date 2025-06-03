@@ -37,22 +37,76 @@ function Login() {
     setError('');
 
     try {
-      console.log('🔍 Tentando fazer login...', formData);
+      console.log('\n🔍 =================================');
+      console.log('🚪 INICIANDO LOGIN NO COMPONENTE');
+      console.log('=================================');
+      console.log('📧 Email:', formData.email);
+      console.log('🔒 Senha:', '*'.repeat(formData.senha.length));
       
+      // ✅ CORREÇÃO: authService.login já retorna os dados diretamente
       const response = await authService.login(formData);
       
-      console.log('✅ Resposta do login:', response.data);
+      console.log('📦 Resposta completa do authService:', response);
+      console.log('🎫 Token:', response.token?.substring(0, 20) + '...');
+      console.log('👤 Usuário:', response.usuario?.nome);
+      
+      // ✅ CORREÇÃO: Usar response diretamente, não response.data
+      if (!response.token || !response.usuario) {
+        throw new Error('Resposta inválida do servidor - token ou usuário ausente');
+      }
       
       // Usar o método login do AuthContext
-      login(response.data.usuario, response.data.token);
+      login(response.usuario, response.token);
       
-      console.log('✅ Login realizado, redirecionando...');
+      console.log('✅ Login realizado com sucesso!');
+      console.log('🔄 Redirecionando para dashboard...');
+      console.log('=================================\n');
       
       // Redirecionar para dashboard
       navigate('/');
+      
     } catch (error) {
-      console.error('❌ Erro no login:', error);
-      setError(error.response?.data?.message || 'Erro ao fazer login');
+      console.log('\n❌ =================================');
+      console.log('💥 ERRO NO LOGIN DO COMPONENTE');
+      console.log('=================================');
+      console.error('🔍 Erro completo:', error);
+      
+      let errorMessage = 'Erro ao fazer login';
+      
+      if (error.response) {
+        // Erro da API
+        console.log('📊 Status:', error.response.status);
+        console.log('📝 Data:', error.response.data);
+        errorMessage = error.response.data?.message || 'Credenciais inválidas';
+        
+        // Mensagens específicas por status
+        switch (error.response.status) {
+          case 401:
+            errorMessage = 'Email ou senha incorretos';
+            break;
+          case 404:
+            errorMessage = 'Usuário não encontrado';
+            break;
+          case 500:
+            errorMessage = 'Erro interno do servidor';
+            break;
+        }
+        
+      } else if (error.request) {
+        // Erro de rede
+        console.log('📡 Erro de conexão');
+        errorMessage = 'Erro de conexão. Verifique se o servidor está rodando.';
+        
+      } else {
+        // Erro de configuração
+        console.log('⚙️ Erro de configuração:', error.message);
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
+      console.log('📝 Mensagem mostrada ao usuário:', errorMessage);
+      console.log('=================================\n');
+      
     } finally {
       setLoading(false);
     }
@@ -145,7 +199,7 @@ function Login() {
             CRIAR NOVA CONTA
           </Button>
 
-          {/* Link para Admin */}
+          {/* Link para Suporte */}
           <Box textAlign="center" mt={2}>
             <Typography variant="body2" color="textSecondary">
               Problemas com acesso?{' '}

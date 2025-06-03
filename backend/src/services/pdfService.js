@@ -1,7 +1,7 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
-const { DadosEmpresa } = require('../models');
+// // // // // const { DadosEmpresa } = require('../models'); // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE
 
 class PDFService {
   async gerarPDFCliente(cliente) {

@@ -1,68 +1,42 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const clienteController = require('../controllers/clienteController');
-const { verificarToken } = require('../middleware/authMiddleware');
 
 // ============================================
-// MIDDLEWARE: Todas as rotas precisam de autenticação
-// ============================================
-router.use(verificarToken);
-
-// ============================================
-// ROTAS PRINCIPAIS (FUNCIONANDO)
+// ROTAS DE CLIENTES - FUNCIONAIS
 // ============================================
 
-// LISTAR CLIENTES com paginação e filtros
-router.get('/', clienteController.listar);
+// GET /api/clientes - Listar todos os clientes
+router.get('/', clienteController.listarTodos);
 
-// BUSCAR CLIENTE POR ID (usando método que existe no controller)
-router.get('/:id', clienteController.buscarPorId);
+// GET /api/clientes/pesquisar/:termo - Pesquisar clientes
+router.get('/pesquisar/:termo', clienteController.pesquisar);
 
-// BUSCAR CLIENTE POR CPF (novo método)
+// GET /api/clientes/verificar-cpf/:cpf - Verificar se CPF existe
+router.get('/verificar-cpf/:cpf', clienteController.verificarCpfExiste);
+
+// GET /api/clientes/cpf/:cpf - Buscar cliente por CPF
 router.get('/cpf/:cpf', clienteController.buscarPorCpf);
 
-// VERIFICAR SE CPF EXISTE (novo método)
-router.get('/verificar-cpf/:cpf', clienteController.verificarCpf);
-
-// BUSCAR OU CRIAR CLIENTE (novo método premium!)
+// POST /api/clientes/buscar-ou-criar - Buscar ou criar cliente
 router.post('/buscar-ou-criar', clienteController.buscarOuCriar);
 
-// CRIAR CLIENTE NOVO
+// POST /api/clientes/validar-cpf - Validar CPF
+router.post('/validar-cpf', clienteController.validarCpf);
+
+// POST /api/clientes - Criar novo cliente
 router.post('/', clienteController.criar);
 
-// ATUALIZAR CLIENTE (usando método que existe)
+// GET /api/clientes/:id - Buscar cliente por ID (deve ficar após rotas específicas)
+router.get('/:id', clienteController.buscarPorId);
+
+// PUT /api/clientes/:id - Atualizar cliente
 router.put('/:id', clienteController.atualizar);
 
-// DELETAR CLIENTE (usando método que existe)
-router.delete('/:id', clienteController.deletar);
+// DELETE /api/clientes/:id - Inativar cliente
+router.delete('/:id', clienteController.inativar);
 
-// ============================================
-// ROTAS ESPECIAIS (NOVAS)
-// ============================================
-
-// ESTATÍSTICAS GERAIS
-router.get('/estatisticas/:empresa_id?', clienteController.obterEstatisticas);
-
-// ============================================
-// ROTAS REMOVIDAS (métodos não implementados)
-// ============================================
-
-// Estas rotas foram comentadas porque os métodos não existem no controller:
-// router.put('/cpf/:cpf', clienteController.atualizarPorCpf);
-// router.delete('/cpf/:cpf', clienteController.desativarPorCpf);
-// router.get('/historico/:cpf', clienteController.buscarHistoricoCompleto);
-
-// ============================================
-// TRATAMENTO DE ERROS GLOBAL
-// ============================================
-router.use((error, req, res, next) => {
-  console.error('Erro nas rotas de cliente:', error);
-  
-  res.status(error.status || 500).json({
-    sucesso: false,
-    erro: error.message || 'Erro interno do servidor',
-    timestamp: new Date().toISOString()
-  });
-});
+// DELETE /api/clientes/:id/deletar - Deletar permanentemente
+router.delete('/:id/deletar', clienteController.deletar);
 
 module.exports = router;

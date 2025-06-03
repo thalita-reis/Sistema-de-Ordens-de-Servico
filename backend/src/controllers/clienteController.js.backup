@@ -36,26 +36,15 @@ class ClienteController {
       const dataQuery = `
         SELECT 
           id,
-          nome,
           cpf,
+          nome,
           email,
           telefone,
-          celular,
-          rua,
-          numero,
-          complemento,
-          bairro,
-          cidade,
-          uf,
-          cep,
-          pessoa_juridica,
-          observacoes_gerais,
-          ficha_inativa,
+          endereco,
+          empresa_id,
           ativo,
-          data_inclusao,
           created_at,
-          updated_at,
-          empresa_id
+          updated_at
         FROM clientes 
         ${whereClause}
         ORDER BY nome ASC
@@ -109,26 +98,15 @@ class ClienteController {
       const query = `
         SELECT 
           id,
-          nome,
           cpf,
+          nome,
           email,
           telefone,
-          celular,
-          rua,
-          numero,
-          complemento,
-          bairro,
-          cidade,
-          uf,
-          cep,
-          pessoa_juridica,
-          observacoes_gerais,
-          ficha_inativa,
+          endereco,
+          empresa_id,
           ativo,
-          data_inclusao,
           created_at,
-          updated_at,
-          empresa_id
+          updated_at
         FROM clientes 
         WHERE id = $1 AND ativo = true
       `;
@@ -228,57 +206,59 @@ class ClienteController {
         });
       }
       
-      const cpfLimpo = dadosCliente.cpf ? dadosCliente.cpf.replace(/[^\d]/g, '') : null;
+      if (!dadosCliente.cpf || dadosCliente.cpf.trim() === '') {
+        return res.status(400).json({ 
+          erro: 'CPF é obrigatório',
+          success: false
+        });
+      }
       
-      // Verificar se CPF já existe (apenas se CPF foi fornecido)
-      if (cpfLimpo) {
-        const cpfExistente = await database.query(
-          'SELECT id FROM clientes WHERE cpf = $1',
-          [cpfLimpo]
-        );
-        
-        if (cpfExistente.rows.length > 0) {
-          return res.status(400).json({
-            erro: 'CPF já cadastrado',
-            mensagem: `CPF ${dadosCliente.cpf} já está em uso`,
-            success: false
-          });
-        }
+      const cpfLimpo = dadosCliente.cpf.replace(/[^\d]/g, '');
+      
+      // Verificar se CPF já existe
+      const cpfExistente = await database.query(
+        'SELECT id FROM clientes WHERE cpf = $1',
+        [cpfLimpo]
+      );
+      
+      if (cpfExistente.rows.length > 0) {
+        return res.status(400).json({
+          erro: 'CPF já cadastrado',
+          mensagem: `CPF ${dadosCliente.cpf} já está em uso`,
+          success: false
+        });
+      }
+      
+      // Criar endereço completo se campos separados forem enviados
+      let enderecoCompleto = dadosCliente.endereco || '';
+      if (!enderecoCompleto && (dadosCliente.rua || dadosCliente.cidade)) {
+        const partes = [];
+        if (dadosCliente.rua) partes.push(dadosCliente.rua);
+        if (dadosCliente.numero) partes.push(dadosCliente.numero);
+        if (dadosCliente.bairro) partes.push(dadosCliente.bairro);
+        if (dadosCliente.cidade) partes.push(dadosCliente.cidade);
+        if (dadosCliente.uf) partes.push(dadosCliente.uf);
+        if (dadosCliente.cep) partes.push(`CEP: ${dadosCliente.cep}`);
+        enderecoCompleto = partes.join(', ');
       }
       
       // Criar cliente - APENAS com colunas que EXISTEM
       const query = `
         INSERT INTO clientes (
-          nome, cpf, email, telefone, celular,
-          rua, numero, complemento, bairro, cidade, uf, cep,
-          pessoa_juridica, observacoes_gerais,
-          data_inclusao, created_at, updated_at,
-          empresa_id, ativo
+          cpf, nome, email, telefone, endereco, empresa_id, ativo, created_at, updated_at
         ) VALUES (
-          $1, $2, $3, $4, $5,
-          $6, $7, $8, $9, $10, $11, $12,
-          $13, $14,
-          NOW(), NOW(), NOW(),
-          $15, true
+          $1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         ) RETURNING *
       `;
       
       const valores = [
-        dadosCliente.nome.trim(),
         cpfLimpo,
+        dadosCliente.nome.trim(),
         dadosCliente.email || null,
-        dadosCliente.telefone || null,
-        dadosCliente.celular || null,
-        dadosCliente.rua || null,
-        dadosCliente.numero || null,
-        dadosCliente.complemento || null,
-        dadosCliente.bairro || null,
-        dadosCliente.cidade || null,
-        dadosCliente.uf || null,
-        dadosCliente.cep || null,
-        dadosCliente.pessoa_juridica || false,
-        dadosCliente.observacoes_gerais || null,
-        dadosCliente.empresa_id || 1 // Empresa padrão
+        dadosCliente.telefone || dadosCliente.celular || null, // Usar telefone ou celular
+        enderecoCompleto || null,
+        dadosCliente.empresa_id || 1, // Empresa padrão
+        true // ativo
       ];
       
       const result = await database.query(query, valores);
@@ -324,43 +304,37 @@ class ClienteController {
         }
       }
       
+      // Criar endereço completo se campos separados forem enviados
+      let enderecoCompleto = dadosCliente.endereco || '';
+      if (!enderecoCompleto && (dadosCliente.rua || dadosCliente.cidade)) {
+        const partes = [];
+        if (dadosCliente.rua) partes.push(dadosCliente.rua);
+        if (dadosCliente.numero) partes.push(dadosCliente.numero);
+        if (dadosCliente.bairro) partes.push(dadosCliente.bairro);
+        if (dadosCliente.cidade) partes.push(dadosCliente.cidade);
+        if (dadosCliente.uf) partes.push(dadosCliente.uf);
+        if (dadosCliente.cep) partes.push(`CEP: ${dadosCliente.cep}`);
+        enderecoCompleto = partes.join(', ');
+      }
+      
       const query = `
         UPDATE clientes SET
-          nome = $1,
           cpf = $2,
-          email = $3,
-          telefone = $4,
-          celular = $5,
-          rua = $6,
-          numero = $7,
-          complemento = $8,
-          bairro = $9,
-          cidade = $10,
-          uf = $11,
-          cep = $12,
-          pessoa_juridica = $13,
-          observacoes_gerais = $14,
-          updated_at = NOW()
-        WHERE id = $15 AND ativo = true
+          nome = $3,
+          email = $4,
+          telefone = $5,
+          endereco = $6,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1 AND ativo = true
         RETURNING *
       `;
       
       const valores = [
-        dadosCliente.nome,
+        id,
         cpfLimpo,
-        dadosCliente.email || null,
-        dadosCliente.telefone || null,
-        dadosCliente.celular || null,
-        dadosCliente.rua || null,
-        dadosCliente.numero || null,
-        dadosCliente.complemento || null,
-        dadosCliente.bairro || null,
-        dadosCliente.cidade || null,
-        dadosCliente.uf || null,
-        dadosCliente.cep || null,
-        dadosCliente.pessoa_juridica || false,
-        dadosCliente.observacoes_gerais || null,
-        id
+        dadosCliente.nome,
+        dadosCliente.telefone || dadosCliente.celular,
+        enderecoCompleto,
       ];
       
       const result = await database.query(query, valores);
@@ -398,7 +372,7 @@ class ClienteController {
       const query = `
         UPDATE clientes SET 
           ativo = false, 
-          updated_at = NOW() 
+          updated_at = CURRENT_TIMESTAMP 
         WHERE id = $1 
         RETURNING *
       `;
@@ -489,7 +463,7 @@ class ClienteController {
       // Se não existe, criar novo
       const novoCliente = await database.query(`
         INSERT INTO clientes (cpf, nome, empresa_id, ativo, created_at, updated_at)
-        VALUES ($1, $2, 1, true, NOW(), NOW())
+        VALUES ($1, $2, 1, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         RETURNING *
       `, [cpfLimpo, nome]);
       

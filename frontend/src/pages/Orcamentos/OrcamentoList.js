@@ -24,6 +24,7 @@ import { formatDate, formatCurrency } from '../../utils/formatters';
 function OrcamentoList() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  // ✅ CORREÇÃO 1: Estado inicial como array vazio em vez de undefined
   const [orcamentos, setOrcamentos] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(0);
@@ -35,13 +36,29 @@ function OrcamentoList() {
     orcamento: null,
   });
 
+  // ✅ CORREÇÃO PRINCIPAL: Colunas com formato correto para cliente
   const columns = [
     { id: 'numero', label: 'Número', minWidth: 100 },
     { 
       id: 'cliente', 
       label: 'Cliente', 
       minWidth: 170,
-      format: (value, row) => row.cliente?.nome || 'N/A'
+      format: (value, row) => {
+        // ✅ MÚLTIPLAS TENTATIVAS para garantir compatibilidade
+        const nomeCliente = row.cliente_nome || 
+                           row.cliente?.nome || 
+                           row.nome_cliente || 
+                           row.nomeCliente;
+        
+        console.log('🔍 Debug cliente:', { 
+          numero: row.numero, 
+          cliente_nome: row.cliente_nome,
+          cliente_objeto: row.cliente,
+          nomeCliente 
+        });
+        
+        return nomeCliente || 'N/A';
+      }
     },
     { 
       id: 'data_criacao', 
@@ -94,9 +111,12 @@ function OrcamentoList() {
     return () => clearTimeout(timeoutId);
   }, [search]);
 
+  // ✅ CORREÇÃO 2: Função carregarOrcamentos com tratamento robusto
   const carregarOrcamentos = async () => {
     try {
       setLoading(true);
+      console.log('🔍 OrcamentoList.carregarOrcamentos - Iniciando...');
+      
       const params = {
         page: page + 1,
         limit: rowsPerPage,
@@ -107,12 +127,65 @@ function OrcamentoList() {
         params.status = statusFilter;
       }
 
+      console.log('📄 Parâmetros da busca:', params);
+
       const response = await orcamentoService.listar(params);
-      setOrcamentos(response.data.orcamentos);
-      setTotalCount(response.data.total);
+      
+      console.log('📦 Resposta completa:', response);
+      console.log('📊 response.data:', response.data);
+
+      // ✅ CORREÇÃO 3: Tratamento robusto da resposta
+      let orcamentosData = [];
+      let totalData = 0;
+
+      if (response && response.data) {
+        // Caso 1: response.data.orcamentos (formato esperado)
+        if (response.data.orcamentos && Array.isArray(response.data.orcamentos)) {
+          orcamentosData = response.data.orcamentos;
+          totalData = response.data.total || response.data.orcamentos.length;
+          console.log('✅ Formato 1: response.data.orcamentos encontrado');
+        }
+        // Caso 2: response.data é array direto
+        else if (Array.isArray(response.data)) {
+          orcamentosData = response.data;
+          totalData = response.data.length;
+          console.log('✅ Formato 2: response.data como array direto');
+        }
+        // Caso 3: response.data.data (formato alternativo do backend)
+        else if (response.data.data && Array.isArray(response.data.data)) {
+          orcamentosData = response.data.data;
+          totalData = response.data.total || response.data.data.length;
+          console.log('✅ Formato 3: response.data.data encontrado');
+        }
+        // Caso 4: Fallback - dados existem mas estrutura diferente
+        else {
+          console.log('⚠️ Estrutura de dados não reconhecida:', response.data);
+          orcamentosData = [];
+          totalData = 0;
+        }
+      } else {
+        console.log('❌ response ou response.data não existe');
+        orcamentosData = [];
+        totalData = 0;
+      }
+
+      console.log('✅ Dados extraídos:', {
+        orcamentos: orcamentosData.length,
+        total: totalData,
+        primeiroOrcamento: orcamentosData[0] // Para debug
+      });
+
+      // ✅ CORREÇÃO 4: Sempre garantir que é array
+      setOrcamentos(Array.isArray(orcamentosData) ? orcamentosData : []);
+      setTotalCount(typeof totalData === 'number' ? totalData : 0);
+
     } catch (error) {
+      console.error('❌ Erro ao carregar orçamentos:', error);
       toast.error('Erro ao carregar orçamentos');
-      console.error(error);
+      
+      // ✅ CORREÇÃO 5: Em caso de erro, garantir estado seguro
+      setOrcamentos([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
@@ -151,6 +224,14 @@ function OrcamentoList() {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
+
+  // ✅ CORREÇÃO 6: Verificação extra antes de renderizar DataTable
+  console.log('🎯 Renderização - Estado atual:', {
+    loading,
+    orcamentos: orcamentos?.length || 0,
+    isArray: Array.isArray(orcamentos),
+    primeiroItem: orcamentos[0] // Para debug
+  });
 
   return (
     <Box>
@@ -205,10 +286,11 @@ function OrcamentoList() {
       {loading ? (
         <LoadingSpinner />
       ) : (
+        // ✅ CORREÇÃO 7: Verificação dupla antes de passar para DataTable
         <DataTable
           columns={columns}
-          data={orcamentos}
-          totalCount={totalCount}
+          data={Array.isArray(orcamentos) ? orcamentos : []}
+          totalCount={totalCount || 0}
           page={page}
           rowsPerPage={rowsPerPage}
           onPageChange={handlePageChange}

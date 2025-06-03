@@ -1,4 +1,4 @@
-const { DadosEmpresa } = require('../models');
+// // // // // const { DadosEmpresa } = require('../models'); // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE // COMENTADO AUTOMATICAMENTE
 
 module.exports = {
   async buscar(req, res) {
