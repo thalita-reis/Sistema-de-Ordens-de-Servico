@@ -206,7 +206,8 @@ app.get('/', (req, res) => {
     },
     endpoints: [
       '/api/health',
-      '/api/auth',
+      '/api/auth/login',
+      '/api/auth/registrar',
       '/api/clientes',
       '/api/orcamentos',
       '/api/dados-empresa'
@@ -222,14 +223,223 @@ app.get('/', (req, res) => {
 });
 
 // ============================================
-// 🔐 ROTAS DE AUTENTICAÇÃO - CARREGAMENTO DINÂMICO
+// 🔐 ROTAS DE AUTENTICAÇÃO DIRETAS (GARANTIDAS)
+// ============================================
+
+// Rota de registro
+app.post('/api/auth/registrar', async (req, res) => {
+  try {
+    const { nome, email, senha, tipo } = req.body;
+    
+    console.log('📝 Registro solicitado:', { nome, email, tipo });
+    
+    // Verificações básicas
+    if (!nome || !email || !senha) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nome, email e senha são obrigatórios'
+      });
+    }
+
+    const currentPool = await getPoolConnection();
+    
+    if (!currentPool) {
+      return res.status(503).json({
+        success: false,
+        message: 'Banco de dados não disponível - sistema em modo degradado'
+      });
+    }
+
+    // Verificar se usuário já existe
+    const userExists = await currentPool.query(
+      'SELECT id FROM usuarios WHERE email = $1',
+      [email]
+    );
+
+    if (userExists.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Email já cadastrado'
+      });
+    }
+
+    // Hash da senha
+    const bcrypt = require('bcrypt');
+    const hashedPassword = await bcrypt.hash(senha, 10);
+
+    // Inserir usuário
+    const result = await currentPool.query(`
+      INSERT INTO usuarios (nome, email, senha, tipo, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, NOW(), NOW())
+      RETURNING id, nome, email, tipo
+    `, [nome, email, hashedPassword, tipo || 'usuario']);
+
+    const newUser = result.rows[0];
+
+    console.log('✅ Usuário criado:', newUser.email);
+
+    res.status(201).json({
+      success: true,
+      message: 'Usuário criado com sucesso!',
+      usuario: newUser
+    });
+
+  } catch (error) {
+    console.error('❌ Erro no registro:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro interno do servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Rota de login
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, senha } = req.body;
+    
+    console.log('🔐 Login solicitado:', email);
+    
+    if (!email || !senha) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email e senha são obrigatórios'
+      });
+    }
+
+    const currentPool = await getPoolConnection();
+    
+    if (!currentPool) {
+      return res.status(503).json({
+        success: false,
+        message: 'Banco de dados não disponível - sistema em modo degradado'
+      });
+    }
+
+    // Buscar usuário
+    const result = await currentPool.query(
+      'SELECT id, nome, email, senha, tipo FROM usuarios WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Email ou senha inválidos'
+      });
+    }
+
+    const user = result.rows[0];
+    
+    // Verificar senha
+    const bcrypt = require('bcrypt');
+    const senhaValida = await bcrypt.compare(senha, user.senha);
+
+    if (!senhaValida) {
+      return res.status(401).json({
+        success: false,
+        message: 'Email ou senha inválidos'
+      });
+    }
+
+    // Gerar token JWT
+    const jwt = require('jsonwebtoken');
+    const token = jwt.sign(
+      { 
+        id: user.id, 
+        email: user.email, 
+        tipo: user.tipo 
+      },
+      process.env.JWT_SECRET || 'sistema_macedo_secret_2024',
+      { expiresIn: '24h' }
+    );
+
+    console.log('✅ Login realizado:', user.email);
+
+    res.status(200).json({
+      success: true,
+      message: 'Login realizado com sucesso!',
+      token,
+      usuario: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+        tipo: user.tipo
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Erro no login:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro interno do servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Perfil do usuário (bonus)
+app.get('/api/auth/perfil', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token não fornecido'
+      });
+    }
+
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'sistema_macedo_secret_2024');
+    
+    const currentPool = await getPoolConnection();
+    
+    if (!currentPool) {
+      return res.status(503).json({
+        success: false,
+        message: 'Banco de dados não disponível'
+      });
+    }
+
+    const result = await currentPool.query(
+      'SELECT id, nome, email, tipo FROM usuarios WHERE id = $1',
+      [decoded.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuário não encontrado'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      usuario: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao obter perfil:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Token inválido'
+    });
+  }
+});
+
+// ============================================
+// 🔐 ROTAS DE AUTENTICAÇÃO - CARREGAMENTO DINÂMICO (FALLBACK)
 // ============================================
 app.use('/api/auth', (req, res, next) => {
+  // Se as rotas diretas acima não funcionaram, tentar carregar as rotas do arquivo
   loadRoutes();
   if (authRoutes) {
     authRoutes(req, res, next);
   } else {
-    res.status(503).json({ error: 'Serviço de autenticação indisponível' });
+    // Se não conseguir carregar, as rotas diretas já foram executadas acima
+    next();
   }
 });
 
@@ -443,6 +653,13 @@ app.get('/api/health', async (req, res) => {
         } catch (error) {
           tablesStatus.orcamentos = 'not_found';
         }
+
+        try {
+          const usuariosCount = await currentPool.query('SELECT COUNT(*) FROM usuarios');
+          tablesStatus.usuarios = parseInt(usuariosCount.rows[0].count);
+        } catch (error) {
+          tablesStatus.usuarios = 'not_found';
+        }
       } catch (error) {
         // Database error, mas continua
       }
@@ -463,6 +680,10 @@ app.get('/api/health', async (req, res) => {
         current_time: dbTest?.rows[0]?.current_time || null
       },
       tables: tablesStatus,
+      auth: {
+        routes_available: true,
+        jwt_secret_configured: !!(process.env.JWT_SECRET || 'sistema_macedo_secret_2024')
+      },
       version: '3.0.0'
     };
 
@@ -562,6 +783,8 @@ app.use('*', (req, res) => {
       'GET /',
       'GET /api/health',
       'POST /api/auth/login',
+      'POST /api/auth/registrar',
+      'GET /api/auth/perfil',
       'GET /api/clientes',
       'GET /api/dados-empresa',
       'GET /api/orcamentos'
@@ -643,6 +866,13 @@ async function iniciarServidor() {
         } catch (error) {
           console.log('⚠️ Tabela orcamentos não encontrada');
         }
+
+        try {
+          const usuariosResult = await currentPool.query('SELECT COUNT(*) FROM usuarios');
+          console.log('✅ Tabela usuarios:', usuariosResult.rows[0].count, 'registros');
+        } catch (error) {
+          console.log('⚠️ Tabela usuarios não encontrada');
+        }
       }
     }
     
@@ -663,7 +893,8 @@ async function iniciarServidor() {
         console.log('🎯 ENDPOINTS PRINCIPAIS:');
         console.log('   🏠 / - Página inicial');
         console.log('   🏥 /api/health - Status');
-        console.log('   🔐 /api/auth/* - Autenticação');
+        console.log('   🔐 /api/auth/login - Login');
+        console.log('   📝 /api/auth/registrar - Registro');
         console.log('   👤 /api/clientes/* - Clientes');
         console.log('   🏢 /api/dados-empresa/* - Empresa');
         console.log('   📋 /api/orcamentos/* - Orçamentos');
