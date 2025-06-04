@@ -84,6 +84,169 @@ const { Pool } = require('pg');
 let pool = null;
 let dbConfigured = false;
 
+// ============================================
+// 🚀 SISTEMA DE MIGRAÇÃO AUTOMÁTICA (NOVO)
+// ============================================
+const createInitialTables = async (currentPool) => {
+  try {
+    console.log('🗄️ Iniciando migração inicial...');
+    
+    // ✅ TABELA CLIENTES
+    await currentPool.query(`
+      CREATE TABLE IF NOT EXISTS clientes (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        cpf VARCHAR(14),
+        data_inclusao DATE DEFAULT CURRENT_DATE,
+        telefone VARCHAR(20),
+        celular VARCHAR(20),
+        fax VARCHAR(20),
+        rua TEXT,
+        numero VARCHAR(10),
+        cep VARCHAR(10),
+        bairro VARCHAR(100),
+        cidade VARCHAR(100),
+        uf VARCHAR(2),
+        email VARCHAR(255),
+        pessoa_juridica BOOLEAN DEFAULT FALSE,
+        observacoes_gerais TEXT,
+        ficha_inativa BOOLEAN DEFAULT FALSE,
+        complemento VARCHAR(255),
+        empresa_id INTEGER,
+        ativo BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ Tabela clientes criada!');
+
+    // ✅ TABELA DADOS_EMPRESAS
+    await currentPool.query(`
+      CREATE TABLE IF NOT EXISTS dados_empresas (
+        id SERIAL PRIMARY KEY,
+        razao_social VARCHAR(255),
+        nome_oficina VARCHAR(255),
+        cnpj VARCHAR(18),
+        inscricao_estadual VARCHAR(20),
+        email VARCHAR(255),
+        endereco TEXT,
+        numero VARCHAR(10),
+        bairro VARCHAR(100),
+        cidade VARCHAR(100),
+        estado VARCHAR(2),
+        cep VARCHAR(10),
+        celular VARCHAR(20),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ Tabela dados_empresas criada!');
+
+    // ✅ TABELA ORCAMENTOS
+    await currentPool.query(`
+      CREATE TABLE IF NOT EXISTS orcamentos (
+        id SERIAL PRIMARY KEY,
+        numero VARCHAR(50) UNIQUE NOT NULL,
+        cliente_id INTEGER REFERENCES clientes(id),
+        data_criacao DATE DEFAULT CURRENT_DATE,
+        data_validade DATE,
+        valor_total DECIMAL(10,2) DEFAULT 0,
+        total_desconto DECIMAL(10,2) DEFAULT 0,
+        valor_final DECIMAL(10,2) DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'pendente',
+        observacoes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ Tabela orcamentos criada!');
+
+    // ✅ TABELA USUARIOS
+    await currentPool.query(`
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        senha VARCHAR(255) NOT NULL,
+        tipo VARCHAR(20) DEFAULT 'usuario',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ Tabela usuarios criada!');
+
+    // ✅ INSERIR DADOS INICIAIS DA EMPRESA
+    const empresaExists = await currentPool.query('SELECT id FROM dados_empresas LIMIT 1');
+    if (empresaExists.rows.length === 0) {
+      await currentPool.query(`
+        INSERT INTO dados_empresas (
+          razao_social, nome_oficina, cnpj, inscricao_estadual, 
+          email, endereco, celular
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [
+        'Oficina Macedo Ltda',
+        'Oficina Programa Macedo',
+        '43976790001107',
+        '674.438.803.079',
+        'contato@oficinamacedo.com',
+        'Rua do Manifesto, 2326 - Ipiranga - São Paulo/SP',
+        '(11) 94808-0600'
+      ]);
+      console.log('✅ Dados da empresa inseridos!');
+    }
+
+    // ✅ CRIAR USUÁRIO ADMIN PADRÃO
+    const bcrypt = require('bcrypt');
+    const adminExists = await currentPool.query('SELECT id FROM usuarios WHERE email = $1', ['admin@oficinamacedo.com']);
+    if (adminExists.rows.length === 0) {
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      await currentPool.query(`
+        INSERT INTO usuarios (nome, email, senha, tipo)
+        VALUES ($1, $2, $3, $4)
+      `, ['Administrador', 'admin@oficinamacedo.com', hashedPassword, 'admin']);
+      console.log('✅ Usuário admin criado! (admin@oficinamacedo.com / admin123)');
+    }
+
+    // ✅ INSERIR CLIENTES DE EXEMPLO
+    const clientesExists = await currentPool.query('SELECT id FROM clientes LIMIT 1');
+    if (clientesExists.rows.length === 0) {
+      await currentPool.query(`
+        INSERT INTO clientes (nome, cpf, email, telefone, rua, cidade, uf)
+        VALUES 
+        ('João Silva', '123.456.789-00', 'joao@email.com', '(11) 99999-1111', 'Rua A, 123', 'São Paulo', 'SP'),
+        ('Maria Santos', '987.654.321-00', 'maria@email.com', '(11) 99999-2222', 'Rua B, 456', 'São Paulo', 'SP')
+      `);
+      console.log('✅ Clientes de exemplo inseridos!');
+    }
+
+    console.log('🎉 MIGRAÇÃO INICIAL CONCLUÍDA!');
+    return true;
+  } catch (error) {
+    console.error('❌ Erro na migração inicial:', error);
+    return false;
+  }
+};
+
+const runMigrations = async (currentPool) => {
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      console.log('🔄 Executando migrações automáticas em produção...');
+      const success = await createInitialTables(currentPool);
+      if (success) {
+        console.log('✅ Migrações executadas com sucesso!');
+      }
+      return success;
+    } catch (error) {
+      console.error('❌ Erro nas migrações automáticas:', error.message);
+      return false;
+    }
+  }
+  return true;
+};
+
+// ============================================
+// SUA FUNÇÃO ORIGINAL COM MIGRAÇÃO ADICIONADA
+// ============================================
 async function initDatabase() {
   try {
     const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -111,6 +274,13 @@ async function initDatabase() {
     
     dbConfigured = true;
     console.log('✅ PostgreSQL conectado!');
+    
+    // ✅ NOVA LINHA: EXECUTAR MIGRAÇÕES AUTOMÁTICAS EM PRODUÇÃO
+    const migrationSuccess = await runMigrations(pool);
+    if (migrationSuccess) {
+      console.log('✅ Sistema de banco inicializado completamente!');
+    }
+    
     return true;
     
   } catch (error) {
@@ -176,7 +346,7 @@ app.get('/', async (req, res) => {
 
     const healthData = {
       message: `🚀 Sistema Macedo - API Funcionando na ${platform.toUpperCase()}!`,
-      version: '3.1.0',
+      version: '3.2.0-with-migrations',
       status: 'healthy',
       platform: platform,
       environment: process.env.NODE_ENV || 'development',
@@ -276,7 +446,7 @@ app.get('/api/health', async (req, res) => {
         current_time: dbTest?.rows[0]?.current_time || null
       },
       tables: tablesStatus,
-      version: '3.1.0-hybrid'
+      version: '3.2.0-with-migrations'
     };
 
     res.status(200).json(healthData);
@@ -1708,7 +1878,7 @@ async function iniciarServidor() {
         console.log('   🏢 /api/dados-empresa/* - Empresa');
         console.log('   📋 /api/orcamentos/* - Orçamentos');
         console.log('===============================');
-        console.log('✅ Sistema híbrido Render + Vercel!');
+        console.log('✅ Sistema com migrações automáticas!');
         console.log('===============================\n');
       });
 
