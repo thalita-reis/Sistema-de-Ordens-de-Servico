@@ -1,48 +1,41 @@
 import axios from 'axios';
 
 // ============================================
-// 🚀 CONFIGURAÇÃO INTELIGENTE HÍBRIDA
+// 🚀 CONFIGURAÇÃO INTELIGENTE HÍBRIDA ATUALIZADA
 // ============================================
 
 const getBaseURL = () => {
   const hostname = window.location.hostname;
   
-  // VERCEL: Detecta domínio .vercel.app
+  // ✅ CORREÇÃO CRÍTICA: SEMPRE usar backend Render
+  // Vercel é só frontend, backend sempre no Render
   if (hostname.includes('vercel.app')) {
-    console.log('🌟 Ambiente: VERCEL detectado - usando rotas serverless');
-    return window.location.origin; // https://seu-projeto.vercel.app (SEM /api no final)
-  }
-  
-  // RENDER: Detecta domínio .onrender.com  
-  if (hostname.includes('onrender.com')) {
-    console.log('🔥 Ambiente: RENDER detectado - usando backend dedicado');
+    console.log('🌟 Ambiente: VERCEL detectado - conectando com backend Render');
     return 'https://sistema-de-ordens-de-servico.onrender.com';
   }
   
-  // LOCAL: Detecta localhost
+  // RENDER: Se estiver no próprio Render
+  if (hostname.includes('onrender.com')) {
+    console.log('🔥 Ambiente: RENDER detectado - usando backend local');
+    return window.location.origin;
+  }
+  
+  // LOCAL: Desenvolvimento
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     console.log('🏠 Ambiente: LOCAL detectado');
     return 'http://localhost:5000';
   }
   
-  // REDE LOCAL: IP da rede
-  console.log('🌐 Ambiente: REDE LOCAL detectada:', hostname);
-  return `http://${hostname}:5000`;
+  // FALLBACK: Sempre usar Render em produção
+  console.log('🌐 Ambiente: PRODUÇÃO - usando backend Render');
+  return 'https://sistema-de-ordens-de-servico.onrender.com';
 };
 
 const getAuthRoutes = () => {
   const hostname = window.location.hostname;
   
-  // VERCEL: Precisa de /api/auth/*
-  if (hostname.includes('vercel.app')) {
-    return {
-      login: '/api/auth/login',
-      register: '/api/auth/registrar',
-      profile: '/api/auth/perfil'
-    };
-  }
-  
-  // OUTROS: Usar /auth/* (seu padrão atual)
+  // ✅ CORREÇÃO: SEMPRE usar rotas do backend Render (/auth/*)
+  // Independente da plataforma, o backend está no Render
   return {
     login: '/auth/login',
     register: '/auth/registrar', 
@@ -56,18 +49,18 @@ const getAuthRoutes = () => {
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: window.location.hostname.includes('vercel.app') ? 30000 : 15000,
+  timeout: 30000, // Timeout maior para produção
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 // ============================================
-// 🔄 INTERCEPTOR DE REQUEST (Baseado no seu código)
+// 🔄 INTERCEPTOR DE REQUEST
 // ============================================
 api.interceptors.request.use(
   (config) => {
-    // Seus logs detalhados mantidos
+    // Logs detalhados mantidos
     if (process.env.NODE_ENV === 'development') {
       console.log('\n🚀 =================================');
       console.log('📡 FAZENDO REQUISIÇÃO');
@@ -77,7 +70,6 @@ api.interceptors.request.use(
       console.log('🌍 Ambiente:', process.env.NODE_ENV);
       console.log('🔗 Base URL:', config.baseURL);
       console.log('🏠 Hostname Frontend:', window.location.hostname);
-      console.log('🌐 Porta Frontend:', window.location.port);
       
       if (config.data) {
         console.log('📝 Dados enviados:', config.data);
@@ -85,13 +77,10 @@ api.interceptors.request.use(
       console.log('=================================\n');
     }
     
-    // Adicionar token (sua lógica mantida)
+    // Adicionar token
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔑 Token encontrado:', token.substring(0, 20) + '...');
-      }
     }
     
     return config;
@@ -103,11 +92,10 @@ api.interceptors.request.use(
 );
 
 // ============================================
-// 📥 INTERCEPTOR DE RESPONSE (Seu código aprimorado)
+// 📥 INTERCEPTOR DE RESPONSE
 // ============================================
 api.interceptors.response.use(
   (response) => {
-    // Seus logs de sucesso mantidos
     if (process.env.NODE_ENV === 'development') {
       console.log('\n✅ =================================');
       console.log('📨 RESPOSTA RECEBIDA');
@@ -124,7 +112,6 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Seus logs de erro detalhados mantidos
     if (process.env.NODE_ENV === 'development') {
       console.log('\n❌ =================================');
       console.log('💥 ERRO NA REQUISIÇÃO');
@@ -135,38 +122,9 @@ api.interceptors.response.use(
         console.log('📝 Mensagem:', error.response.data?.message || error.response.data?.erro || error.response.data);
         console.log('🔗 URL:', error.response.config?.url);
         console.log('🌐 Base URL:', error.response.config?.baseURL);
-        
-        switch (error.response.status) {
-          case 401:
-            console.log('🚪 Token expirado ou inválido');
-            break;
-          case 403:
-            console.log('🚫 Acesso negado');
-            break;
-          case 404:
-            console.log('🔍 Endpoint não encontrado');
-            break;
-          case 500:
-            console.log('🔧 Erro interno do servidor');
-            break;
-          default:
-            console.log('❓ Erro desconhecido');
-        }
-        
       } else if (error.request) {
-        console.log('📡 ERRO DE CONEXÃO:');
-        console.log('- Request enviado mas sem resposta');
-        console.log('- Verifique se o backend está rodando');
-        console.log('- URL tentada:', error.config?.baseURL);
-        console.log('- Hostname atual:', window.location.hostname);
-        
-        if (window.location.hostname !== 'localhost') {
-          console.log('💡 DICA: Backend deve estar rodando em:', `http://${window.location.hostname}:5000`);
-          console.log('💡 COMANDO: cd backend && npm run dev');
-        } else {
-          console.log('💡 DICA: Backend deve estar rodando em: http://localhost:5000');
-        }
-        
+        console.log('📡 ERRO DE CONEXÃO - Backend pode estar dormindo no Render');
+        console.log('💡 AGUARDE: Backend está inicializando (até 30s)...');
       } else {
         console.log('⚙️ ERRO DE CONFIGURAÇÃO:', error.message);
       }
@@ -174,18 +132,12 @@ api.interceptors.response.use(
       console.log('=================================\n');
     }
     
-    // Logout automático (sua lógica mantida)
+    // Logout automático em caso de 401
     if (error.response?.status === 401) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 Removendo dados de autenticação...');
-      }
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       
       if (!window.location.pathname.includes('/login')) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🚪 Redirecionando para login...');
-        }
         window.location.href = '/login';
       }
     }
@@ -195,43 +147,111 @@ api.interceptors.response.use(
 );
 
 // ============================================
-// 🔐 FUNÇÕES DE AUTENTICAÇÃO COM ROTAS DINÂMICAS
+// 🔐 FUNÇÕES DE AUTENTICAÇÃO
 // ============================================
 
 export const login = async (email, senha) => {
   try {
     const routes = getAuthRoutes();
     console.log(`🔑 Tentando login com rota: ${routes.login}`);
+    console.log(`🎯 URL completa: ${api.defaults.baseURL}${routes.login}`);
     
-    const response = await api.post(routes.login, { email, senha });
+    // ✅ TENTATIVA MÚLTIPLA - Testar diferentes rotas automaticamente
+    const rotasPossíveis = [
+      routes.login,     // /auth/login (padrão)
+      '/api/auth/login', // Alternativa comum
+      '/login',         // Alternativa simples
+      '/api/login'      // Outra alternativa
+    ];
     
-    if (response.data.success && response.data.token) {
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.usuario || response.data.user));
-      console.log('✅ Login realizado com sucesso!');
-      return response.data;
+    let ultimoErro = null;
+    
+    for (const rota of rotasPossíveis) {
+      try {
+        console.log(`🧪 Testando rota: ${rota}`);
+        
+        const response = await api.post(rota, { email, senha });
+        
+        if (response.data.success && response.data.token) {
+          localStorage.setItem('token', response.data.token);
+          localStorage.setItem('user', JSON.stringify(response.data.usuario || response.data.user));
+          console.log(`✅ Login realizado com sucesso usando rota: ${rota}`);
+          return response.data;
+        }
+        
+        throw new Error(response.data.message || 'Erro no login');
+        
+      } catch (error) {
+        console.log(`❌ Falha na rota ${rota}:`, error.response?.status || error.message);
+        ultimoErro = error;
+        
+        // Se for erro 404 ou 405, tenta próxima rota
+        if (error.response?.status === 404 || error.response?.status === 405) {
+          continue;
+        }
+        
+        // Se for outro erro (401, 400, etc.), não tenta outras rotas
+        break;
+      }
     }
     
-    throw new Error(response.data.message || 'Erro no login');
+    // Se chegou aqui, nenhuma rota funcionou
+    throw ultimoErro;
+    
   } catch (error) {
     console.error('❌ Erro no login:', error);
     throw error;
   }
 };
 
-export const registrar = async (nome, email, senha) => {
+export const registrar = async (nome, email, senha, tipo = 'admin') => {
   try {
     const routes = getAuthRoutes();
     console.log(`📝 Tentando registro com rota: ${routes.register}`);
     
-    const response = await api.post(routes.register, { nome, email, senha });
+    // ✅ TENTATIVA MÚLTIPLA - Testar diferentes rotas automaticamente
+    const rotasPossíveis = [
+      routes.register,      // /auth/registrar (padrão)
+      '/api/auth/registrar', // Alternativa comum
+      '/registrar',         // Alternativa simples
+      '/api/registrar',     // Outra alternativa
+      '/register',          // Em inglês
+      '/api/register'       // Em inglês com /api
+    ];
     
-    if (response.data.success) {
-      console.log('✅ Usuário registrado com sucesso!');
-      return response.data;
+    const dadosRegistro = { nome, email, senha, tipo };
+    let ultimoErro = null;
+    
+    for (const rota of rotasPossíveis) {
+      try {
+        console.log(`🧪 Testando rota de registro: ${rota}`);
+        
+        const response = await api.post(rota, dadosRegistro);
+        
+        if (response.data.success) {
+          console.log(`✅ Usuário registrado com sucesso usando rota: ${rota}`);
+          return response.data;
+        }
+        
+        throw new Error(response.data.message || 'Erro no registro');
+        
+      } catch (error) {
+        console.log(`❌ Falha na rota ${rota}:`, error.response?.status || error.message);
+        ultimoErro = error;
+        
+        // Se for erro 404 ou 405, tenta próxima rota
+        if (error.response?.status === 404 || error.response?.status === 405) {
+          continue;
+        }
+        
+        // Se for outro erro, não tenta outras rotas
+        break;
+      }
     }
     
-    throw new Error(response.data.message || 'Erro no registro');
+    // Se chegou aqui, nenhuma rota funcionou
+    throw ultimoErro;
+    
   } catch (error) {
     console.error('❌ Erro no registro:', error);
     throw error;
@@ -256,8 +276,7 @@ export const logout = () => {
 };
 
 export const isAuthenticated = () => {
-  const token = localStorage.getItem('token');
-  return !!token;
+  return !!localStorage.getItem('token');
 };
 
 export const getCurrentUser = () => {
@@ -266,134 +285,58 @@ export const getCurrentUser = () => {
 };
 
 // ============================================
-// 🧪 SUAS FUNÇÕES DE TESTE MANTIDAS
+// 🧪 FUNÇÕES DE TESTE E DEBUG
 // ============================================
 
 export const testApiConnection = async () => {
   try {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('\n🧪 =================================');
-      console.log('🔍 TESTANDO CONEXÃO COM API');
-      console.log('=================================');
-      const healthUrl = api.defaults.baseURL + (window.location.hostname.includes('vercel.app') ? '/api/health' : '/api/health');
-      console.log('🎯 URL de teste:', healthUrl);
-      console.log('🏠 Frontend rodando em:', window.location.origin);
-      console.log('🌐 Backend esperado em:', api.defaults.baseURL);
-    }
+    console.log('\n🧪 TESTANDO CONEXÃO COM API...');
+    console.log('🎯 URL de teste:', api.defaults.baseURL + '/api/health');
     
-    const healthEndpoint = window.location.hostname.includes('vercel.app') ? '/api/health' : '/api/health';
-    const response = await api.get(healthEndpoint);
+    const response = await api.get('/api/health');
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ CONEXÃO SUCCESSFUL!');
-      console.log('📊 Status:', response.status);
-      console.log('📝 Resposta:', response.data);
-      console.log('=================================\n');
-    }
+    console.log('✅ CONEXÃO SUCCESSFUL!');
+    console.log('📊 Status:', response.status);
+    console.log('📝 Resposta:', response.data);
     
     return { success: true, data: response.data };
     
   } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('❌ FALHA NA CONEXÃO!');
-      console.log('💥 Erro:', error.message);
-      
-      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error') || error.message.includes('CONNECTION_REFUSED')) {
-        const backendUrl = api.defaults.baseURL;
-        console.log('🔧 SOLUÇÕES POSSÍVEIS:');
-        console.log(`   1. Verifique se o backend está rodando em ${backendUrl}`);
-        console.log('   2. Execute: cd backend && npm run dev');
-        console.log('   3. Verifique se a porta 5000 está disponível');
-        console.log('   4. Teste diretamente:', backendUrl + '/api/health');
-      }
-      
-      console.log('=================================\n');
+    console.log('❌ FALHA NA CONEXÃO!');
+    console.log('💥 Erro:', error.message);
+    
+    if (error.code === 'ERR_NETWORK') {
+      console.log('🔧 DICA: Backend pode estar "dormindo" no Render');
+      console.log('   Aguarde até 30s para o backend acordar automaticamente');
     }
+    
     return { success: false, error: error.message };
   }
 };
 
-export const getApiInfo = () => {
-  const info = {
-    baseURL: api.defaults.baseURL,
-    frontendHostname: window.location.hostname,
-    frontendPort: window.location.port,
-    frontendOrigin: window.location.origin,
-    environment: process.env.NODE_ENV,
-    isProduction: process.env.NODE_ENV === 'production',
-    isDevelopment: process.env.NODE_ENV === 'development',
-    platform: window.location.hostname.includes('vercel.app') ? 'vercel' : window.location.hostname.includes('onrender.com') ? 'render' : 'local',
-    hasToken: !!localStorage.getItem('token'),
-    authRoutes: getAuthRoutes()
-  };
-  
-  if (process.env.NODE_ENV === 'development') {
-    console.log('\n📋 =================================');
-    console.log('ℹ️ INFORMAÇÕES DA API');
-    console.log('=================================');
-    console.log('🔗 Base URL API:', info.baseURL);
-    console.log('🏠 Frontend Hostname:', info.frontendHostname);
-    console.log('📡 Frontend Origin:', info.frontendOrigin);
-    console.log('🌍 Environment:', info.environment);
-    console.log('🚀 Plataforma:', info.platform);
-    console.log('🔑 Tem Token:', info.hasToken);
-    console.log('🛣️ Rotas Auth:', info.authRoutes);
-    console.log('=================================\n');
-  }
-  
-  return info;
-};
-
-export const testAuth = async (email = 'admin@sistema.com', senha = 'password') => {
-  try {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('\n🔐 =================================');
-      console.log('🧪 TESTANDO AUTENTICAÇÃO');
-      console.log('=================================');
-      console.log('📧 Email:', email);
-      console.log('🔒 Senha:', '*'.repeat(senha.length));
-    }
-    
-    const response = await login(email, senha);
-    
-    if (process.env.NODE_ENV === 'development') {
-      console.log('✅ LOGIN SUCCESSFUL!');
-      console.log('🎫 Token recebido:', response.token?.substring(0, 20) + '...');
-      console.log('👤 Usuário:', response.usuario?.nome || response.user?.nome);
-      console.log('=================================\n');
-    }
-    
-    return { success: true, data: response };
-    
-  } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('❌ FALHA NO LOGIN!');
-      console.log('💥 Erro:', error.response?.data?.message || error.message);
-      console.log('=================================\n');
-    }
-    
-    return { success: false, error: error.response?.data || error.message };
-  }
-};
-
 // ============================================
-// 👥 FUNÇÕES DE CLIENTES - ATUALIZADAS PARA ESTRUTURA REAL
+// 👥 FUNÇÕES DE CLIENTES - CORRIGIDAS PARA ESTRUTURA REAL
 // ============================================
 
 export const getClientes = async (page = 1, limit = 10, search = '') => {
   try {
-    console.log(`👥 Buscando clientes... (página ${page}, limite ${limit})`);
+    console.log(`👥 Buscando clientes... (página ${page}, limite ${limit}, busca: "${search}")`);
     
     const response = await api.get('/api/clientes', {
       params: { page, limit, search }
     });
     
-    console.log(`✅ ${response.data.clientes?.length || response.data.data?.length || 0} clientes encontrados`);
+    console.log('✅ Resposta recebida do backend:', response.data);
     
-    // ✅ NORMALIZAÇÃO PARA COMPATIBILIDADE
-    const clientesData = response.data.clientes || response.data.data || [];
+    // ✅ NORMALIZAÇÃO ROBUSTA PARA QUALQUER FORMATO DE RESPOSTA
+    const clientesData = response.data.data || response.data.clientes || [];
+    const total = response.data.pagination?.total || response.data.total || 0;
+    const currentPage = response.data.pagination?.page || response.data.page || page;
+    const totalPages = response.data.pagination?.totalPages || response.data.pages || Math.ceil(total / limit);
+    
+    // Normalizar cada cliente para compatibilidade total
     const clientesNormalizados = clientesData.map(cliente => ({
-      // Campos da estrutura real da tabela
+      // ✅ CAMPOS DA ESTRUTURA REAL DA TABELA
       id: cliente.id,
       nome: cliente.nome || '',
       cpf: cliente.cpf || '',
@@ -422,21 +365,36 @@ export const getClientes = async (page = 1, limit = 10, search = '') => {
       estado: cliente.estado || cliente.uf || ''        // Mapear uf → estado
     }));
     
+    console.log(`✅ ${clientesNormalizados.length} clientes normalizados com sucesso`);
+    
     return {
-      ...response.data,
-      clientes: clientesNormalizados,
+      success: true,
       data: clientesNormalizados,
-      success: true
+      clientes: clientesNormalizados,
+      total: total,
+      page: currentPage,
+      totalPages: totalPages,
+      pagination: {
+        currentPage: currentPage,
+        totalPages: totalPages,
+        totalItems: total,
+        itemsPerPage: limit,
+        hasNextPage: currentPage < totalPages,
+        hasPrevPage: currentPage > 1
+      }
     };
     
   } catch (error) {
     console.error('❌ Erro ao buscar clientes:', error);
-    // Fallback robusto para evitar quebrar a aplicação
+    
+    // ✅ FALLBACK ROBUSTO - NUNCA QUEBRAR A APLICAÇÃO
     return { 
-      clientes: [], 
+      success: false,
       data: [],
+      clientes: [], 
       total: 0, 
-      pages: 0,
+      page: 1,
+      totalPages: 0,
       pagination: {
         currentPage: 1,
         totalPages: 0,
@@ -445,8 +403,7 @@ export const getClientes = async (page = 1, limit = 10, search = '') => {
         hasNextPage: false,
         hasPrevPage: false
       },
-      success: false,
-      message: 'Erro ao carregar clientes',
+      message: 'Erro ao carregar clientes. Verifique sua conexão.',
       error: error.response?.data?.message || error.message
     };
   }
@@ -458,7 +415,7 @@ export const getClienteById = async (id) => {
     
     const response = await api.get(`/api/clientes/${id}`);
     
-    const cliente = response.data.cliente || response.data.data || response.data;
+    const cliente = response.data.data || response.data.cliente || response.data;
     
     // ✅ NORMALIZAÇÃO PARA COMPATIBILIDADE
     const clienteNormalizado = {
@@ -494,9 +451,9 @@ export const getClienteById = async (id) => {
     console.log(`✅ Cliente encontrado: ${clienteNormalizado.nome}`);
     
     return {
-      ...response.data,
-      cliente: clienteNormalizado,
-      data: clienteNormalizado
+      success: true,
+      data: clienteNormalizado,
+      cliente: clienteNormalizado
     };
     
   } catch (error) {
@@ -513,7 +470,7 @@ export const createCliente = async (clienteData) => {
     const dadosParaBackend = {
       // Campos obrigatórios
       nome: clienteData.nome,
-      email: clienteData.email,
+      email: clienteData.email || '',
       
       // Campos opcionais - mapear corretamente
       cpf: clienteData.cpf || null,
@@ -539,6 +496,8 @@ export const createCliente = async (clienteData) => {
       empresa_id: clienteData.empresa_id || null,
       ativo: clienteData.ativo !== false // Default true
     };
+    
+    console.log('📤 Dados sendo enviados para o backend:', dadosParaBackend);
     
     const response = await api.post('/api/clientes', dadosParaBackend);
     
@@ -615,9 +574,9 @@ export const deleteCliente = async (id) => {
 export const buscarClientesPorCPF = async (cpf) => {
   try {
     const response = await getClientes(1, 100, cpf);
-    const clientesEncontrados = response.clientes.filter(cliente => 
+    const clientesEncontrados = response.clientes?.filter(cliente => 
       cliente.cpf && cliente.cpf.replace(/\D/g, '') === cpf.replace(/\D/g, '')
-    );
+    ) || [];
     return clientesEncontrados;
   } catch (error) {
     console.error('❌ Erro ao buscar clientes por CPF:', error);
@@ -649,7 +608,7 @@ export const validarCpfUnico = async (cpf, clienteIdExcluir = null) => {
 };
 
 // ============================================
-// 📋 FUNÇÕES DE ORÇAMENTOS - COMPLETAS (mantidas iguais)
+// 📋 FUNÇÕES DE ORÇAMENTOS
 // ============================================
 
 export const getOrcamentos = async (page = 1, limit = 10, search = '') => {
@@ -660,17 +619,24 @@ export const getOrcamentos = async (page = 1, limit = 10, search = '') => {
       params: { page, limit, search }
     });
     
-    console.log(`✅ ${response.data.orcamentos?.length || response.data.data?.length || 0} orçamentos encontrados`);
-    return response.data;
+    console.log(`✅ ${response.data.data?.length || response.data.orcamentos?.length || 0} orçamentos encontrados`);
+    
+    // Normalizar resposta
+    return {
+      ...response.data,
+      success: true,
+      orcamentos: response.data.data || response.data.orcamentos || [],
+      data: response.data.data || response.data.orcamentos || []
+    };
+    
   } catch (error) {
     console.error('❌ Erro ao buscar orçamentos:', error);
-    // Fallback para evitar quebrar a aplicação
     return { 
+      success: false,
       orcamentos: [], 
       data: [],
       total: 0, 
       pages: 0,
-      success: false,
       message: 'Erro ao carregar orçamentos'
     };
   }
@@ -720,14 +686,13 @@ export const deleteOrcamento = async (id) => {
 };
 
 // ============================================
-// 🏢 FUNÇÕES DE DADOS DA EMPRESA - COMPLETAS (mantidas iguais)
+// 🏢 FUNÇÕES DE DADOS DA EMPRESA
 // ============================================
 
 export const getDadosEmpresa = async () => {
   try {
     console.log('🏢 Buscando dados da empresa...');
     
-    // Adicionar timestamp para evitar cache
     const timestamp = Date.now();
     const response = await api.get(`/api/dados-empresa?t=${timestamp}`);
     
@@ -772,7 +737,6 @@ export const getDashboardStats = async () => {
     return response.data;
   } catch (error) {
     console.error('❌ Erro ao buscar estatísticas:', error);
-    // Fallback com dados vazios
     return {
       totalClientes: 0,
       totalOrcamentos: 0,
@@ -784,7 +748,7 @@ export const getDashboardStats = async () => {
 };
 
 // ============================================
-// 🛡️ FUNÇÕES DE SAÚDE E STATUS DA API
+// 🛡️ FUNÇÕES DE SAÚDE E UTILITÁRIAS
 // ============================================
 
 export const getHealthStatus = async () => {
@@ -797,17 +761,30 @@ export const getHealthStatus = async () => {
   }
 };
 
-// ============================================
-// 🎯 SUAS FUNÇÕES UTILITÁRIAS MANTIDAS
-// ============================================
-
-export const isDevelopment = () => process.env.NODE_ENV === 'development';
-export const isProduction = () => process.env.NODE_ENV === 'production';
-export const getCurrentBaseURL = () => api.defaults.baseURL;
+export const getApiInfo = () => {
+  const info = {
+    baseURL: api.defaults.baseURL,
+    frontendHostname: window.location.hostname,
+    frontendOrigin: window.location.origin,
+    environment: process.env.NODE_ENV || 'production',
+    platform: window.location.hostname.includes('vercel.app') ? 'vercel' : 
+              window.location.hostname.includes('onrender.com') ? 'render' : 'local',
+    hasToken: !!localStorage.getItem('token'),
+    authRoutes: getAuthRoutes()
+  };
+  
+  console.log('\n📋 INFORMAÇÕES DA API:');
+  console.log('🔗 Base URL API:', info.baseURL);
+  console.log('🏠 Frontend:', info.frontendOrigin);
+  console.log('🚀 Plataforma:', info.platform);
+  console.log('🔑 Tem Token:', info.hasToken);
+  
+  return info;
+};
 
 export const checkBackendStatus = async () => {
   try {
-    const healthUrl = api.defaults.baseURL + (window.location.hostname.includes('vercel.app') ? '/api/health' : '/api/health');
+    const healthUrl = api.defaults.baseURL + '/api/health';
     const response = await fetch(healthUrl);
     return response.ok;
   } catch (error) {
@@ -815,33 +792,70 @@ export const checkBackendStatus = async () => {
   }
 };
 
-export const debugSystem = async () => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('\n🔍 =================================');
-    console.log('🛠️ DEBUG COMPLETO DO SISTEMA');
-    console.log('=================================');
+export const testAuth = async (email = 'admin@sistema.com', senha = 'password') => {
+  try {
+    console.log('\n🔐 TESTANDO AUTENTICAÇÃO');
+    console.log('📧 Email:', email);
+    console.log('🔒 Senha:', '*'.repeat(senha.length));
     
-    getApiInfo();
+    const response = await login(email, senha);
     
-    console.log('🔍 Verificando se backend está acessível...');
-    const backendOk = await checkBackendStatus();
-    console.log('🎯 Backend status:', backendOk ? '✅ Acessível' : '❌ Inacessível');
+    console.log('✅ LOGIN SUCCESSFUL!');
+    console.log('🎫 Token recebido:', response.token?.substring(0, 20) + '...');
+    console.log('👤 Usuário:', response.usuario?.nome || response.user?.nome);
     
-    const connectionTest = await testApiConnection();
+    return { success: true, data: response };
     
-    if (connectionTest.success) {
-      await testAuth();
-    }
+  } catch (error) {
+    console.log('❌ FALHA NO LOGIN!');
+    console.log('💥 Erro:', error.response?.data?.message || error.message);
     
-    console.log('🏁 Debug completo finalizado!\n');
+    return { success: false, error: error.response?.data || error.message };
   }
 };
 
+export const debugSystem = async () => {
+  console.log('\n🔍 DEBUG COMPLETO DO SISTEMA');
+  console.log('=================================');
+  
+  const apiInfo = getApiInfo();
+  
+  console.log('🔍 Verificando se backend está acessível...');
+  const backendOk = await checkBackendStatus();
+  console.log('🎯 Backend status:', backendOk ? '✅ Acessível' : '❌ Inacessível');
+  
+  const connectionTest = await testApiConnection();
+  console.log('🔌 Conexão:', connectionTest.success ? '✅ OK' : '❌ FALHOU');
+  
+  if (connectionTest.success) {
+    try {
+      const clientesTest = await getClientes(1, 1, '');
+      console.log('👥 Clientes:', clientesTest.success ? '✅ OK' : '❌ FALHOU');
+    } catch (error) {
+      console.log('👥 Clientes: ❌ FALHOU');
+    }
+  }
+  
+  console.log('=================================\n');
+  
+  return {
+    ...apiInfo,
+    conexao: connectionTest.success,
+    backendStatus: backendOk
+  };
+};
+
+// ============================================
+// 🔧 FUNÇÕES AUXILIARES
+// ============================================
+
+export const isDevelopment = () => process.env.NODE_ENV === 'development';
+export const isProduction = () => process.env.NODE_ENV === 'production';
+export const getCurrentBaseURL = () => api.defaults.baseURL;
+
 export const setBaseURL = (newBaseURL) => {
   api.defaults.baseURL = newBaseURL;
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🔄 Base URL alterada para:', newBaseURL);
-  }
+  console.log('🔄 Base URL alterada para:', newBaseURL);
 };
 
 export default api;
