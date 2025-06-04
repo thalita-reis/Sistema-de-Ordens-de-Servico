@@ -8,7 +8,7 @@ const path = require('path');
 const app = express();
 
 // ============================================
-// 🌐 CORS CONFIGURADO - HÍBRIDO RENDER + VERCEL (MELHORADO)
+// 🌐 CORS CONFIGURADO - HÍBRIDO RENDER + VERCEL (SEU CÓDIGO)
 // ============================================
 const corsOptions = {
   origin: function (origin, callback) {
@@ -78,7 +78,7 @@ const corsOptions = {
 };
 
 // ============================================
-// 🔧 MIDDLEWARES DE SEGURANÇA E LOGS (OTIMIZADOS)
+// 🔧 MIDDLEWARES DE SEGURANÇA E LOGS (SEU CÓDIGO)
 // ============================================
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -104,7 +104,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ============================================
-// 🗄️ CONFIGURAÇÃO DO BANCO - HÍBRIDO MELHORADO
+// 🗄️ CONFIGURAÇÃO DO BANCO - SEU CÓDIGO MANTIDO
 // ============================================
 const { Pool } = require('pg');
 
@@ -149,7 +149,7 @@ const initDatabase = async () => {
   }
 };
 
-// Função de fallback usando sua configuração atual
+// Função de fallback usando sua configuração atual (MANTIDA)
 const getPoolConnection = async () => {
   try {
     // Se não tem pool configurado, tentar usar a configuração existente
@@ -181,7 +181,7 @@ const getPoolConnection = async () => {
 };
 
 // ============================================
-// 📝 IMPORTAÇÃO DAS ROTAS - MANTENDO SUA ESTRUTURA
+// 📝 IMPORTAÇÃO DAS ROTAS - SEU CÓDIGO MANTIDO
 // ============================================
 let routesLoaded = false;
 let authRoutes, clienteRoutes, orcamentoRoutes, empresaRoutes;
@@ -205,7 +205,7 @@ const loadRoutes = () => {
 };
 
 // ============================================
-// 🛣️ ROTA RAIZ OTIMIZADA PARA RENDER + VERCEL
+// 🛣️ ROTA RAIZ - SEU CÓDIGO MANTIDO
 // ============================================
 app.get('/', async (req, res) => {
   try {
@@ -240,8 +240,10 @@ app.get('/', async (req, res) => {
       },
       endpoints: [
         'GET /api/health',
-        'POST /auth/login',
-        'POST /auth/registrar',
+        'POST /auth/login',           // ← SEU PADRÃO (RENDER)
+        'POST /auth/registrar',       // ← SEU PADRÃO (RENDER)
+        'POST /api/auth/login',       // ← PADRÃO VERCEL
+        'POST /api/auth/registrar',   // ← PADRÃO VERCEL
         'GET /api/dados-empresa',
         'PUT /api/dados-empresa',
         'GET /api/clientes',
@@ -289,10 +291,8 @@ app.get('/', async (req, res) => {
 });
 
 // ============================================
-// 🔐 ROTAS DE AUTENTICAÇÃO DIRETAS (GARANTIDAS)
+// 🔐 DEPENDÊNCIAS DE AUTENTICAÇÃO
 // ============================================
-
-// Instalar dependências se não existirem
 let bcrypt, jwt;
 try {
   bcrypt = require('bcrypt');
@@ -301,8 +301,12 @@ try {
   console.log('⚠️ Dependências bcrypt/jsonwebtoken não instaladas');
 }
 
-// **ROTA DE REGISTRO**
-app.post('/auth/registrar', async (req, res) => {
+// ============================================
+// 🔐 ROTAS DE AUTENTICAÇÃO DUPLAS (RENDER + VERCEL)
+// ============================================
+
+// Função compartilhada para registro
+const handleRegistro = async (req, res) => {
   try {
     const { nome, email, senha, tipo } = req.body;
     
@@ -373,10 +377,10 @@ app.post('/auth/registrar', async (req, res) => {
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-});
+};
 
-// **ROTA DE LOGIN**
-app.post('/auth/login', async (req, res) => {
+// Função compartilhada para login
+const handleLogin = async (req, res) => {
   try {
     const { email, senha } = req.body;
     
@@ -464,10 +468,18 @@ app.post('/auth/login', async (req, res) => {
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-});
+};
 
-// **ROTA DE PERFIL**
-app.get('/auth/perfil', async (req, res) => {
+// **ROTAS DUPLAS PARA RENDER (SEU PADRÃO ATUAL)**
+app.post('/auth/registrar', handleRegistro);
+app.post('/auth/login', handleLogin);
+
+// **ROTAS DUPLAS PARA VERCEL (PADRÃO VERCEL)**
+app.post('/api/auth/registrar', handleRegistro);
+app.post('/api/auth/login', handleLogin);
+
+// **ROTA DE PERFIL (AMBOS OS PADRÕES)**
+const handlePerfil = async (req, res) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     
@@ -525,10 +537,13 @@ app.get('/auth/perfil', async (req, res) => {
       message: 'Token inválido'
     });
   }
-});
+};
+
+app.get('/auth/perfil', handlePerfil);
+app.get('/api/auth/perfil', handlePerfil);
 
 // ============================================
-// 🏢 ROTAS DE EMPRESA - IMPLEMENTAÇÃO DIRETA GARANTIDA
+// 🏢 ROTAS DE EMPRESA - SEU CÓDIGO MANTIDO
 // ============================================
 
 // **DADOS DA EMPRESA - GET**
@@ -717,7 +732,7 @@ app.put('/api/dados-empresa', async (req, res) => {
 });
 
 // ============================================
-// 👥 ROTAS DE CLIENTES - IMPLEMENTAÇÃO BÁSICA
+// 👥 ROTAS DE CLIENTES - SEU CÓDIGO MANTIDO
 // ============================================
 app.get('/api/clientes', async (req, res) => {
   try {
@@ -793,7 +808,7 @@ app.get('/api/clientes', async (req, res) => {
 });
 
 // ============================================
-// 📄 ROTAS DE ORÇAMENTOS - IMPLEMENTAÇÃO BÁSICA
+// 📄 ROTAS DE ORÇAMENTOS - SEU CÓDIGO MANTIDO
 // ============================================
 app.get('/api/orcamentos', async (req, res) => {
   try {
@@ -869,7 +884,7 @@ app.get('/api/orcamentos', async (req, res) => {
 });
 
 // ============================================
-// 🔐 ROTAS DE AUTENTICAÇÃO - CARREGAMENTO DINÂMICO (FALLBACK)
+// 🔐 ROTAS DE AUTENTICAÇÃO - CARREGAMENTO DINÂMICO (SEU FALLBACK)
 // ============================================
 app.use('/api/auth', (req, res, next) => {
   // Se as rotas diretas acima não capturaram, tentar carregar as rotas do arquivo
@@ -883,7 +898,7 @@ app.use('/api/auth', (req, res, next) => {
 });
 
 // ============================================
-// 👤 ROTAS DE CLIENTES - CARREGAMENTO DINÂMICO (FALLBACK)
+// 👤 ROTAS DE CLIENTES - CARREGAMENTO DINÂMICO (SEU FALLBACK)
 // ============================================
 app.use('/api/clientes', (req, res, next) => {
   // Se a rota direta acima não capturou, tentar carregar as rotas do arquivo
@@ -896,7 +911,7 @@ app.use('/api/clientes', (req, res, next) => {
 });
 
 // ============================================
-// 📋 ROTAS DE ORÇAMENTOS - CARREGAMENTO DINÂMICO (FALLBACK)
+// 📋 ROTAS DE ORÇAMENTOS - CARREGAMENTO DINÂMICO (SEU FALLBACK)
 // ============================================
 app.use('/api/orcamentos', (req, res, next) => {
   // Se a rota direta acima não capturou, tentar carregar as rotas do arquivo
@@ -909,7 +924,7 @@ app.use('/api/orcamentos', (req, res, next) => {
 });
 
 // ============================================
-// 🏢 ROTAS DE EMPRESA - CARREGAMENTO DINÂMICO (FALLBACK)
+// 🏢 ROTAS DE EMPRESA - CARREGAMENTO DINÂMICO (SEU FALLBACK)
 // ============================================
 app.use('/api/dados-empresa', (req, res, next) => {
   // Se as rotas diretas acima não capturaram, tentar carregar as rotas do arquivo
@@ -922,7 +937,7 @@ app.use('/api/dados-empresa', (req, res, next) => {
 });
 
 // ============================================
-// 🏥 HEALTH CHECK HÍBRIDO RENDER + VERCEL
+// 🏥 HEALTH CHECK - SEU CÓDIGO MANTIDO
 // ============================================
 app.get('/api/health', async (req, res) => {
   try {
@@ -984,7 +999,7 @@ app.get('/api/health', async (req, res) => {
         orcamentos: !!orcamentoRoutes,
         empresa: !!empresaRoutes
       },
-      version: '3.1.0'
+      version: '3.1.0-hybrid'
     };
 
     res.status(200).json(healthData);
@@ -1004,7 +1019,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // ============================================
-// 🧪 ROTAS DE TESTE (mantendo suas)
+// 🧪 ROTAS DE TESTE - SEU CÓDIGO MANTIDO
 // ============================================
 app.get('/api/dados-empresa/test', async (req, res) => {
   try {
@@ -1065,7 +1080,7 @@ app.get('/api/cors/test', (req, res) => {
 });
 
 // ============================================
-// 🚫 TRATAMENTO DE ROTAS NÃO ENCONTRADAS
+// 🚫 TRATAMENTO DE ROTAS NÃO ENCONTRADAS - SEU CÓDIGO
 // ============================================
 app.use('*', (req, res) => {
   // Log simplificado para produção
@@ -1081,8 +1096,10 @@ app.use('*', (req, res) => {
     available_endpoints: [
       'GET /',
       'GET /api/health',
-      'POST /auth/login',
-      'POST /auth/registrar',
+      'POST /auth/login (Render)',
+      'POST /auth/registrar (Render)',
+      'POST /api/auth/login (Vercel)',
+      'POST /api/auth/registrar (Vercel)',
       'GET /auth/perfil',
       'GET /api/dados-empresa',
       'PUT /api/dados-empresa',
@@ -1093,7 +1110,7 @@ app.use('*', (req, res) => {
 });
 
 // ============================================
-// 🚨 TRATAMENTO GLOBAL DE ERROS
+// 🚨 TRATAMENTO GLOBAL DE ERROS - SEU CÓDIGO
 // ============================================
 app.use((error, req, res, next) => {
   console.error('💥 Erro capturado:', error.message);
@@ -1107,7 +1124,7 @@ app.use((error, req, res, next) => {
 });
 
 // ============================================
-// 🚀 INICIALIZAÇÃO HÍBRIDA RENDER + VERCEL (OTIMIZADA)
+// 🚀 INICIALIZAÇÃO HÍBRIDA - SEU CÓDIGO MANTIDO
 // ============================================
 const PORT = process.env.PORT || 5000;
 
@@ -1124,7 +1141,7 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// Função de inicialização para Render (mantendo sua lógica)
+// Função de inicialização para Render (SEU CÓDIGO MANTIDO)
 async function iniciarServidor() {
   try {
     console.log('🚀 Iniciando servidor...');
@@ -1183,8 +1200,10 @@ async function iniciarServidor() {
         console.log('🎯 ENDPOINTS PRINCIPAIS:');
         console.log('   🏠 / - Página inicial');
         console.log('   🏥 /api/health - Status');
-        console.log('   🔐 /auth/login - Login');
-        console.log('   📝 /auth/registrar - Registro');
+        console.log('   🔐 /auth/login - Login (Render)');
+        console.log('   🔐 /api/auth/login - Login (Vercel)');
+        console.log('   📝 /auth/registrar - Registro (Render)');
+        console.log('   📝 /api/auth/registrar - Registro (Vercel)');
         console.log('   👤 /api/clientes/* - Clientes');
         console.log('   🏢 /api/dados-empresa/* - Empresa');
         console.log('   📋 /api/orcamentos/* - Orçamentos');
@@ -1212,7 +1231,7 @@ async function iniciarServidor() {
 }
 
 // ============================================
-// 🔚 DESLIGAMENTO GRACIOSO (mantendo sua lógica)
+// 🔚 DESLIGAMENTO GRACIOSO - SEU CÓDIGO MANTIDO
 // ============================================
 process.on('SIGINT', async () => {
   console.log('\n👋 Desligando servidor...');
@@ -1230,7 +1249,7 @@ process.on('SIGINT', async () => {
   }
 });
 
-// Capturar erros não tratados (mantendo sua lógica)
+// Capturar erros não tratados (SEU CÓDIGO MANTIDO)
 process.on('unhandledRejection', (reason, promise) => {
   console.error('🚨 Promise rejeitada:', reason);
   if (process.env.NODE_ENV !== 'production') {
